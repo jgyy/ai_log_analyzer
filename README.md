@@ -1,4 +1,4 @@
-# DevOps AI Log Analyzer (MVP)
+# DevOps AI Log Analyzer
 
 ## Overview
 An AI-powered DevOps incident analysis system that ingests logs, identifies root causes, and generates structured mitigation plans. Designed for SREs, platform engineers, and DevOps teams to accelerate troubleshooting and incident response.
