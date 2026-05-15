@@ -48,6 +48,20 @@ Select role (header-based for MVP)
 Click Run Analysis
 View structured results across 3 tabs
 
+## Product Screenshots
+### Home page
+<img width="1261" height="744" alt="image" src="https://github.com/user-attachments/assets/af702089-d325-4a5b-8e22-a3dced4cac1d" />
+
+### Analysis
+<img width="1290" height="758" alt="image" src="https://github.com/user-attachments/assets/8c1c82ce-4730-41f1-b0e4-db651a7cef99" />
+
+### Root cause identification
+<img width="1266" height="749" alt="image" src="https://github.com/user-attachments/assets/a9e476f6-d280-4514-98dd-5cc5532d99b5" />
+
+### Mitigation plan
+<img width="1270" height="772" alt="image" src="https://github.com/user-attachments/assets/c6ae3e26-9485-417d-b790-c68a4e32334c" />
+
+
 ## 🔮 Extensibility Roadmap
 Feature
 Implementation Path
