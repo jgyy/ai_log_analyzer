@@ -36,9 +36,9 @@ AI system was successful in identifying root cause from a set of logs related to
 ## Architecture
 [UI: Next.js] → (Paste/Upload Logs) → [Backend: FastAPI] → (Preprocess & Chunk) → [AI Engine] → (Structured JSON) → [UI Tabs]
 
-- **Frontend**: Next.js 14 + Tailwind + Lucide Icons
+- **Frontend**: Next.js + Tailwind + Lucide Icons
 - **Backend**: FastAPI + Pydantic validation + JWT Role Check
-- **AI Layer**: Google Gemini 2.5 Flash (JSON schema enforced) + Extensible Model Router
+- **AI Layer**: Google Gemini (JSON schema enforced) + Extensible Model Router
 - **Log Preprocessor**: Log parsing using Drain3, Context-aware chunking, error sampling, deduplication
 - **Output**: Strict Pydantic schema mapped to 3 exact UI tabs
 
