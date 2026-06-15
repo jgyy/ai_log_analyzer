@@ -116,6 +116,9 @@ ai_log_analyzer/
 │   ├── postcss.config.js
 │   ├── tailwind.config.js
 │   └── tsconfig.json
+├── docs                           
+│   ├── ai-dev
+|   |   ├── README.md               # Details on how AI was used in the development of this project
 └── README.md
 ```
 
