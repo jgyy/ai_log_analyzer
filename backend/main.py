@@ -171,41 +171,43 @@ def create_organization(
         is_active=db_org.is_active
     )
 
-@app.get("/api/org/{org_id}", response_model=OrganizationResponse)
-def get_organization(
-    org_id: str = Path(...),
-    current_user: UserResponse = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    # 🔐 Org-level access check
-    if current_user.organization_id != org_id:
-        raise HTTPException(status_code=403, detail="Access denied to this organization")
+# @app.get("/api/org/{org_id}", response_model=OrganizationResponse)
+# def get_organization(
+#     org_id: str = Path(...),
+#     current_user: UserResponse = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     print(f"3. Entered /api/org/{org_id}")
+#     # 🔐 Org-level access check
+#     if current_user.organization_id != org_id:
+#         raise HTTPException(status_code=403, detail="Access denied to this organization")
     
-    org = db.query(Organization).filter(Organization.id == org_id).first()
-    if not org:
-        raise HTTPException(status_code=404, detail="Organization not found")
-    return org
+#     org = db.query(Organization).filter(Organization.id == org_id).first()
+#     if not org:
+#         raise HTTPException(status_code=404, detail="Organization not found")
+#     return org
 
-@app.get("/api/org/{org_id}/users", response_model=List[UserResponse])
-def list_organization_users(
-    org_id: str = Path(...),
-    current_user: UserResponse = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    # 🔐 Admin or same-org check
-    if current_user.organization_id != org_id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Access denied")
+# @app.get("/api/org/{org_id}/users", response_model=List[UserResponse])
+# def list_organization_users(
+#     org_id: str = Path(...),
+#     current_user: UserResponse = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     print(f"2. Entered /api/org/{org_id}/users")
+#     # 🔐 Admin or same-org check
+#     if current_user.organization_id != org_id and current_user.role != "admin":
+#         raise HTTPException(status_code=403, detail="Access denied")
         
-    users = db.query(User).filter(User.organization_id == org_id).all()
-    orgs = {o.id: o for o in db.query(Organization).all()}
+#     users = db.query(User).filter(User.organization_id == org_id).all()
+#     orgs = {o.id: o for o in db.query(Organization).all()}
     
-    return [
-        UserResponse(
-            id=u.id, email=u.email, full_name=u.full_name, role=u.role,
-            organization_id=u.organization_id,
-            organization_name=orgs[u.organization_id].name if u.organization_id in orgs else "Unknown"
-        ) for u in users
-    ]
+#     return [
+#         UserResponse(
+#             id=u.id, email=u.email, full_name=u.full_name, role=u.role,
+#             organization_id=u.organization_id,
+#             organization_name=orgs[u.organization_id].name if u.organization_id in orgs else "Unknown"
+#         ) for u in users
+#     ]
 
 # ============ LOG ANALYSIS ENDPOINTS ============
 @app.post("/api/analyze", response_model=LogAnalysisResponse)
@@ -297,9 +299,10 @@ def list_org_users(
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    print(f"1. /org/users - user: {current_user}; db: {db}")
     """List all users in the current user's organization"""
     users = db.query(User).filter(User.organization_id == current_user.organization_id).all()
-    
+    print(f"users: {users}")
     return [
         UserResponse(
             id=u.id,
