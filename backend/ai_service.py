@@ -1,8 +1,18 @@
 from google import genai
-from google.genai import types as genai_types
 from anthropic import AsyncAnthropic
 from schemas import AnalysisResult
+from google.genai import types as genai_types
+from schemas import (
+    AffectedComponent,
+    AnalysisResult,
+    CollectedEvidence,
+    ExecutableAction,
+    Severity,
+    SourceSummary,
+    VisualSummary,
+)
 import os
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -35,6 +45,7 @@ In addition to the written analysis, populate the "diagrams" object with three v
 - mitigation_flowchart: a Mermaid flowchart of the mitigation phases (Prepare → Pre-Validate → Apply → Post-Validate), with key step titles as short labels, including a rollback branch.
 
 Keep node labels short (under 8 words) and always wrap node text in quotes if it contains special characters like parentheses or colons.
+Keep executable actions empty unless the backend provides them. Mitigation commands are advisory text only.
 
 Logs:
 {logs}
@@ -79,3 +90,88 @@ Logs:
                 data = inner
 
         return AnalysisResult.model_validate(data)
+
+    async def analyze_incident(
+        self,
+        collected: dict,
+        domain: str,
+    ) -> AnalysisResult:
+        payload = {
+            "source_summary": [item.model_dump() for item in collected["source_summary"]],
+            "evidence": [item.model_dump() for item in collected["evidence"]],
+            "backend_allowlisted_actions": [item.model_dump() for item in collected["actions"]],
+        }
+        prompt = f"""
+You are an expert DevOps SRE incident analyst.
+Analyze this local {domain} evidence and return STRICT JSON matching the schema.
+
+Rules:
+- Base root cause, hypotheses, impact, and mitigation on the evidence ids provided.
+- If evidence is partial or connector collection failed, say so in investigation_gaps.
+- Explain the incident in plain language for non-technical users in visual_summary.
+- recommended_actions must only include actions from backend_allowlisted_actions. Do not invent executable action ids or shell commands.
+- command_or_action fields in mitigation_plan are advisory runbook text unless they exactly refer to a backend allowlisted action.
+- Return ONLY raw JSON, no markdown.
+
+Structured incident evidence:
+{json.dumps(payload, default=str)[:50000]}
+"""
+        response = await self.client.aio.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
+                temperature=0.2,
+                response_mime_type="application/json",
+                response_schema=AnalysisResult,
+            ),
+        )
+
+        result = AnalysisResult.model_validate_json(response.text)
+        return self.with_connector_context(result, collected)
+
+    def with_connector_context(self, result: AnalysisResult, collected: dict) -> AnalysisResult:
+        result.source_summary = collected["source_summary"]
+        result.evidence = collected["evidence"]
+        result.recommended_actions = collected["actions"]
+
+        if not result.affected_components:
+            result.affected_components = self._affected_components_from_evidence(collected["evidence"])
+
+        if not result.visual_summary.plain_english_summary:
+            critical = [item for item in collected["evidence"] if item.severity == Severity.CRITICAL]
+            warning = [item for item in collected["evidence"] if item.severity == Severity.WARNING]
+            headline = "Critical infrastructure issue detected" if critical else "Infrastructure evidence collected"
+            result.visual_summary = VisualSummary(
+                headline=headline,
+                likely_failure_path=[item.component for item in (critical or warning)[:4]],
+                plain_english_summary=result.root_cause.investigation_summary,
+                business_impact=result.root_cause.impact,
+                fix_summary=result.mitigation_plan.summary,
+            )
+
+        if any(item.severity == Severity.CRITICAL for item in collected["evidence"]):
+            result.severity = Severity.CRITICAL
+        elif any(item.severity == Severity.WARNING for item in collected["evidence"]):
+            result.severity = Severity.WARNING
+
+        return result
+
+    def _affected_components_from_evidence(self, evidence: list[CollectedEvidence]) -> list[AffectedComponent]:
+        components: dict[str, AffectedComponent] = {}
+        for item in evidence:
+            if item.severity not in [Severity.CRITICAL, Severity.WARNING]:
+                continue
+            key = f"{item.source}:{item.component}"
+            if key not in components:
+                components[key] = AffectedComponent(
+                    name=item.component,
+                    source=item.source,
+                    status=item.severity,
+                    impact=item.message[:240],
+                    evidence_refs=[item.id],
+                )
+            else:
+                components[key].evidence_refs.append(item.id)
+                if item.severity == Severity.CRITICAL:
+                    components[key].status = Severity.CRITICAL
+        return list(components.values())[:12]

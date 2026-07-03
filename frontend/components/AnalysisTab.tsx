@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
-import { Clock, AlertTriangle, Wrench } from "lucide-react";
+import { Activity, Clock, AlertTriangle, Wrench } from "lucide-react";
 import { AnalysisResult } from "@/lib/types";
+import OverviewTab from "./TabViews/OverviewTab";
 import TimelineTab from "./TabViews/TimelineTab";
 import RootCauseTab from "./TabViews/RootCauseTab";
 import MitigationTab from "./TabViews/MitigationTab";
@@ -9,9 +10,10 @@ import MitigationTab from "./TabViews/MitigationTab";
 export default function AnalysisTabs({ data }: { data: AnalysisResult }) {
   const [active, setActive] = useState(0);
   const tabs = [
-    { id: 0, label: "Investigation Timeline", icon: Clock },
-    { id: 1, label: "Root Cause", icon: AlertTriangle },
-    { id: 2, label: "Mitigation Plan", icon: Wrench },
+    { id: 0, label: "Overview", icon: Activity },
+    { id: 1, label: "Investigation Timeline", icon: Clock },
+    { id: 2, label: "Root Cause", icon: AlertTriangle },
+    { id: 3, label: "Mitigation Plan", icon: Wrench },
   ];
 
   return (
@@ -34,7 +36,7 @@ export default function AnalysisTabs({ data }: { data: AnalysisResult }) {
       <div className="p-6 min-h-[400px]">
         {active === 0 && <TimelineTab data={data.investigation_timeline} diagram={data.diagrams?.timeline_flowchart} />}
         {active === 1 && <RootCauseTab data={data.root_cause} diagram={data.diagrams?.root_cause_diagram} />}
-        {active === 2 && <MitigationTab data={data.mitigation_plan} diagram={data.diagrams?.mitigation_flowchart} />}
+        {active === 2 && <MitigationTab data={data.mitigation_plan} diagram={data.diagrams?.mitigation_flowchart} actions={data.recommended_actions || []} />}
       </div>
     </div>
   );

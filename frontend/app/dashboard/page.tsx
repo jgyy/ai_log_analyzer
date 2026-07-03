@@ -48,8 +48,8 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="w-full px-6 py-8">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-slate-100 mb-2">Log Analysis</h2>
-          <p className="text-slate-400">Upload logs and get AI-powered root cause analysis</p>
+          <h2 className="text-2xl font-bold text-slate-100 mb-2">Incident Analysis</h2>
+          <p className="text-slate-400">Collect local Linux and Docker evidence or analyze uploaded logs</p>
         </div>
         
         {/* Recent Analyses Preview */}
@@ -94,7 +94,7 @@ export default function Dashboard() {
         )}
         
         {/* Log Uploader Component */}
-        <LogUploader onAnalysisComplete={() => window.location.reload()} />
+        <LogUploader />
       </main>
     </div>
   );

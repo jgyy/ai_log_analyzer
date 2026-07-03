@@ -1,5 +1,8 @@
+"use client";
+import { useState } from "react";
 import { Clipboard, ArrowRight, RotateCcw, Bot } from "lucide-react";
-import { AnalysisResult } from "@/lib/types";
+import { executeAction } from "@/lib/api";
+import { AnalysisResult, ExecutableAction } from "@/lib/types";
 import DiagramLayout from "@/components/DiagramLayout";
 
 const StepCard = ({ title, steps, color = "blue" }: { title: string, steps: {title:string, description:string, command_or_action:string}[], color?: "blue"|"emerald"|"amber"|"purple" }) => {
@@ -32,7 +35,26 @@ const StepCard = ({ title, steps, color = "blue" }: { title: string, steps: {tit
   );
 };
 
-export default function MitigationTab({ data, diagram }: { data: AnalysisResult["mitigation_plan"]; diagram?: string }) {
+export default function MitigationTab({ data, diagram, actions = [] }: { data: AnalysisResult["mitigation_plan"], diagram?: string, actions?: ExecutableAction[] }) {
+  const [runningAction, setRunningAction] = useState<string | null>(null);
+  const [actionResult, setActionResult] = useState<string | null>(null);
+
+  const handleExecute = async (action: ExecutableAction) => {
+    const approved = window.confirm(`Execute approved action: ${action.label}?\n\nTarget: ${action.target}\nRisk: ${action.risk_level}`);
+    if (!approved) return;
+
+    setRunningAction(action.id);
+    setActionResult(null);
+    try {
+      const result = await executeAction(action.id);
+      setActionResult(`${action.label}: ${result.status}${result.error ? ` - ${result.error}` : ""}${result.output ? ` - ${result.output}` : ""}`);
+    } catch (err: any) {
+      setActionResult(err.message || "Action execution failed");
+    } finally {
+      setRunningAction(null);
+    }
+  };
+
   return (
     <DiagramLayout diagram={diagram} id="mitigation">
       <div className="space-y-4">
@@ -64,6 +86,39 @@ export default function MitigationTab({ data, diagram }: { data: AnalysisResult[
           </div>
         </div>
         </div>
+
+        {actions.length > 0 && (
+          <div className="p-4 border border-emerald-700/50 rounded-lg bg-emerald-950/20">
+            <h3 className="font-semibold text-emerald-300 mb-3 flex items-center gap-2"><ArrowRight className="h-4 w-4"/> Approved Actions</h3>
+            <div className="space-y-3">
+              {actions.map((action) => (
+                <div key={action.id} className="rounded border border-slate-700/60 bg-slate-950/40 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-slate-200">{action.label}</div>
+                      <div className="mt-1 text-xs text-slate-500">{action.action_type} · {action.target}</div>
+                      {action.preconditions.length > 0 && (
+                        <div className="mt-2 text-xs text-slate-400">{action.preconditions.join(" ")}</div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleExecute(action)}
+                      disabled={runningAction === action.id}
+                      className="shrink-0 rounded bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {runningAction === action.id ? "Running" : "Execute"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {actionResult && (
+              <div className="mt-3 rounded border border-slate-700 bg-black/30 p-3 text-xs text-slate-300">
+                {actionResult}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </DiagramLayout>
   );
