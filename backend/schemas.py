@@ -86,10 +86,16 @@ class MitigationPlan(BaseModel):
     rollback_steps: List[str]
     agent_spec_ready: List[str]
 
+class AnalysisDiagrams(BaseModel):
+    timeline_flowchart: str
+    root_cause_diagram: str
+    mitigation_flowchart: str
+
 class AnalysisResult(BaseModel):
     investigation_timeline: InvestigationTimeline
     root_cause: RootCauseSection
     mitigation_plan: MitigationPlan
+    diagrams: Optional[AnalysisDiagrams] = None
 
 class LogAnalysisRequest(BaseModel):
     logs: str

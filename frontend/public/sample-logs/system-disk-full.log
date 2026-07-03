@@ -1,0 +1,87 @@
+2026-07-03T08:00:31Z db-primary-01 monitoring-agent[771]: disk usage /var 74% (148G/200G)
+2026-07-03T08:01:22Z db-primary-01 postgres[791]: LOG:  connection received: host=10.0.2.29 port=52418
+2026-07-03T08:02:25Z db-primary-01 postgres[512]: LOG:  checkpoint complete: wrote 3331 buffers (13.6%)
+2026-07-03T08:03:12Z db-primary-01 monitoring-agent[771]: disk usage /var 68% (136G/200G)
+2026-07-03T08:04:15Z db-primary-01 monitoring-agent[771]: disk usage /var 79% (158G/200G)
+2026-07-03T08:05:10Z db-primary-01 cron[512]: (root) CMD (/usr/lib/php/sessionclean)
+2026-07-03T08:06:36Z db-primary-01 postgres[543]: LOG:  connection received: host=10.0.2.17 port=53317
+2026-07-03T08:07:58Z db-primary-01 cron[512]: (root) CMD (/usr/lib/php/sessionclean)
+2026-07-03T08:08:48Z db-primary-01 postgres[830]: LOG:  connection received: host=10.0.2.25 port=54685
+2026-07-03T08:09:10Z db-primary-01 postgres[512]: LOG:  checkpoint complete: wrote 2907 buffers (18.1%)
+2026-07-03T08:10:01Z db-primary-01 monitoring-agent[771]: disk usage /var 78% (156G/200G)
+2026-07-03T08:11:08Z db-primary-01 monitoring-agent[771]: disk usage /var 76% (152G/200G)
+2026-07-03T08:12:12Z db-primary-01 monitoring-agent[771]: disk usage /var 77% (154G/200G)
+2026-07-03T08:13:14Z db-primary-01 monitoring-agent[771]: disk usage /var 74% (148G/200G)
+2026-07-03T08:14:08Z db-primary-01 monitoring-agent[771]: disk usage /var 67% (134G/200G)
+2026-07-03T08:14:43Z db-primary-01 postgres[661]: LOG:  connection received: host=10.0.2.13 port=57559
+2026-07-03T08:15:26Z db-primary-01 monitoring-agent[771]: disk usage /var 75% (150G/200G)
+2026-07-03T08:16:21Z db-primary-01 postgres[889]: LOG:  connection received: host=10.0.2.26 port=59555
+2026-07-03T08:17:17Z db-primary-01 postgres[599]: LOG:  connection received: host=10.0.2.19 port=47454
+2026-07-03T08:18:23Z db-primary-01 monitoring-agent[771]: disk usage /var 60% (120G/200G)
+2026-07-03T08:19:51Z db-primary-01 postgres[512]: LOG:  checkpoint complete: wrote 2186 buffers (29.5%)
+2026-07-03T08:21:21Z db-primary-01 monitoring-agent[771]: disk usage /var 64% (128G/200G)
+2026-07-03T08:22:43Z db-primary-01 postgres[512]: LOG:  checkpoint complete: wrote 2050 buffers (21.5%)
+2026-07-03T08:24:03Z db-primary-01 monitoring-agent[771]: disk usage /var 70% (140G/200G)
+2026-07-03T08:24:46Z db-primary-01 postgres[629]: LOG:  connection received: host=10.0.2.25 port=43738
+2026-07-03T08:25:14Z db-primary-01 monitoring-agent[771]: disk usage /var 62% (124G/200G)
+2026-07-03T08:25:40Z db-primary-01 monitoring-agent[771]: disk usage /var 78% (156G/200G)
+2026-07-03T08:26:38Z db-primary-01 postgres[512]: LOG:  checkpoint complete: wrote 3016 buffers (12.4%)
+2026-07-03T08:27:51Z db-primary-01 cron[512]: (root) CMD (/usr/lib/php/sessionclean)
+2026-07-03T08:28:39Z db-primary-01 postgres[694]: LOG:  connection received: host=10.0.2.24 port=54507
+2026-07-03T08:29:37Z db-primary-01 postgres[719]: LOG:  connection received: host=10.0.2.19 port=58632
+2026-07-03T08:30:04Z db-primary-01 cron[512]: (root) CMD (/usr/lib/php/sessionclean)
+2026-07-03T08:30:36Z db-primary-01 postgres[606]: LOG:  connection received: host=10.0.2.30 port=46914
+2026-07-03T08:31:29Z db-primary-01 postgres[580]: LOG:  connection received: host=10.0.2.17 port=45695
+2026-07-03T08:32:59Z db-primary-01 postgres[512]: LOG:  checkpoint complete: wrote 2010 buffers (18.2%)
+2026-07-03T08:34:19Z db-primary-01 monitoring-agent[771]: disk usage /var 67% (134G/200G)
+2026-07-03T08:35:15Z db-primary-01 postgres[859]: LOG:  connection received: host=10.0.2.24 port=42332
+2026-07-03T08:36:04Z db-primary-01 postgres[820]: LOG:  connection received: host=10.0.2.28 port=46482
+2026-07-03T08:37:18Z db-primary-01 postgres[512]: LOG:  checkpoint complete: wrote 2920 buffers (23.0%)
+2026-07-03T08:38:12Z db-primary-01 postgres[536]: LOG:  connection received: host=10.0.2.11 port=45436
+2026-07-03T08:39:11Z db-primary-01 cron[512]: (root) CMD (/usr/lib/php/sessionclean)
+2026-07-03T08:40:07Z db-primary-01 monitoring-agent[771]: disk usage /var 74% (148G/200G)
+2026-07-03T08:41:05Z db-primary-01 postgres[639]: LOG:  connection received: host=10.0.2.26 port=57694
+2026-07-03T08:54:56Z db-primary-01 monitoring-agent[771]: disk usage /var 89% (178G/200G)
+2026-07-03T09:01:18Z db-primary-01 monitoring-agent[771]: disk usage /var 93% (186G/200G)
+2026-07-03T09:06:58Z db-primary-01 monitoring-agent[771]: disk usage /var 100% (200G/200G)
+2026-07-03T09:07:58Z db-primary-01 postgres[8890]: WARNING:  could not write to file "pg_wal/000000010000000000000091": No space left on device
+2026-07-03T09:07:58Z db-primary-01 postgres[8890]: ERROR:  could not extend file "base/16401/16789": No space left on device
+2026-07-03T09:07:58Z db-primary-01 postgres[8890]: HINT:  Check free disk space.
+2026-07-03T09:07:59Z db-primary-01 kernel: EXT4-fs error (device nvme0n1p1): ext4_do_update_inode:4886: comm postgres: corrupted inode
+2026-07-03T09:07:59Z db-primary-01 postgres[512]: FATAL:  the database system is in recovery mode
+2026-07-03T09:07:59Z db-primary-01 postgres[512]: LOG:  server process (PID 8890) exited with exit code 1
+2026-07-03T09:07:59Z db-primary-01 postgres[512]: LOG:  terminating any other active server processes
+2026-07-03T09:08:00Z db-primary-01 app-orders-svc[2201]: ERROR: could not connect to database: connection refused
+2026-07-03T09:08:00Z db-primary-01 app-orders-svc[2201]: ERROR: could not connect to database: connection refused
+2026-07-03T09:08:00Z db-primary-01 app-orders-svc[2201]: ERROR: could not connect to database: connection refused
+2026-07-03T09:08:00Z db-primary-01 monitoring-agent[771]: disk usage /var 100% (200G/200G)
+2026-07-03T09:08:00Z db-primary-01 monitoring-agent[771]: CRITICAL: filesystem /var is full, no space left on device
+2026-07-03T09:08:06Z db-primary-01 systemd[1]: postgresql.service: Main process exited, code=exited, status=1/FAILURE
+2026-07-03T09:08:06Z db-primary-01 systemd[1]: postgresql.service: Failed with result 'exit-code'.
+2026-07-03T09:08:11Z db-primary-01 systemd[1]: postgresql.service: Scheduled restart job, restart counter is at 1.
+2026-07-03T09:08:13Z db-primary-01 postgres[9101]: FATAL:  could not create lock file "postmaster.pid": No space left on device
+2026-07-03T09:08:13Z db-primary-01 systemd[1]: postgresql.service: Main process exited, code=exited, status=1/FAILURE
+2026-07-03T09:08:18Z db-primary-01 systemd[1]: postgresql.service: Scheduled restart job, restart counter is at 2.
+2026-07-03T09:08:20Z db-primary-01 postgres[9102]: FATAL:  could not create lock file "postmaster.pid": No space left on device
+2026-07-03T09:08:20Z db-primary-01 systemd[1]: postgresql.service: Main process exited, code=exited, status=1/FAILURE
+2026-07-03T09:08:25Z db-primary-01 systemd[1]: postgresql.service: Scheduled restart job, restart counter is at 3.
+2026-07-03T09:08:27Z db-primary-01 postgres[9103]: FATAL:  could not create lock file "postmaster.pid": No space left on device
+2026-07-03T09:08:27Z db-primary-01 systemd[1]: postgresql.service: Main process exited, code=exited, status=1/FAILURE
+2026-07-03T09:08:32Z db-primary-01 alertmanager: Alert firing - DatabaseDown (severity=critical, host=db-primary-01)
+2026-07-03T09:08:32Z db-primary-01 alertmanager: Alert firing - DiskSpaceCritical (severity=critical, host=db-primary-01, mount=/var)
+2026-07-03T09:09:47Z db-primary-01 postgres[809]: LOG:  connection received: host=10.0.2.18 port=40847
+2026-07-03T09:10:18Z db-primary-01 monitoring-agent[771]: disk usage /var 78% (156G/200G)
+2026-07-03T09:10:40Z db-primary-01 postgres[844]: LOG:  connection received: host=10.0.2.18 port=58882
+2026-07-03T09:11:05Z db-primary-01 postgres[589]: LOG:  connection received: host=10.0.2.25 port=57005
+2026-07-03T09:12:21Z db-primary-01 postgres[592]: LOG:  connection received: host=10.0.2.28 port=54283
+2026-07-03T09:13:43Z db-primary-01 postgres[740]: LOG:  connection received: host=10.0.2.21 port=53380
+2026-07-03T09:14:45Z db-primary-01 monitoring-agent[771]: disk usage /var 63% (126G/200G)
+2026-07-03T09:15:25Z db-primary-01 monitoring-agent[771]: disk usage /var 75% (150G/200G)
+2026-07-03T09:16:21Z db-primary-01 postgres[705]: LOG:  connection received: host=10.0.2.27 port=41202
+2026-07-03T09:17:39Z db-primary-01 postgres[512]: LOG:  checkpoint complete: wrote 3033 buffers (16.5%)
+2026-07-03T09:18:50Z db-primary-01 postgres[500]: LOG:  connection received: host=10.0.2.27 port=55138
+2026-07-03T09:20:02Z db-primary-01 postgres[512]: LOG:  checkpoint complete: wrote 4123 buffers (17.2%)
+2026-07-03T09:21:25Z db-primary-01 cron[512]: (root) CMD (/usr/lib/php/sessionclean)
+2026-07-03T09:21:51Z db-primary-01 monitoring-agent[771]: disk usage /var 77% (154G/200G)
+2026-07-03T09:22:27Z db-primary-01 postgres[724]: LOG:  connection received: host=10.0.2.25 port=43978
+2026-07-03T09:22:50Z db-primary-01 postgres[811]: LOG:  connection received: host=10.0.2.17 port=45189

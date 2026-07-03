@@ -51,12 +51,9 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == user.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Check if this is the first user → make them admin
-    total_users = db.query(User).count()
-    is_first_user = total_users == 0
-    
     # Create org if not provided
-    if not user.organization_id:
+    is_new_org = not user.organization_id
+    if is_new_org:
         org_id = str(uuid.uuid4())
         org = Organization(
             id=org_id,
@@ -66,7 +63,11 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         db.add(org)
         db.commit()
         user.organization_id = org_id
-    
+
+    # First user in an organization becomes its admin
+    org_user_count = db.query(User).filter(User.organization_id == user.organization_id).count()
+    is_first_user = is_new_org or org_user_count == 0
+
     # Create user - FIRST USER IS AUTO-ADMIN
     user_id = str(uuid.uuid4())
     db_user = User(

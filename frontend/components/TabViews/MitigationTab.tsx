@@ -1,5 +1,6 @@
 import { Clipboard, ArrowRight, RotateCcw, Bot } from "lucide-react";
 import { AnalysisResult } from "@/lib/types";
+import DiagramLayout from "@/components/DiagramLayout";
 
 const StepCard = ({ title, steps, color = "blue" }: { title: string, steps: {title:string, description:string, command_or_action:string}[], color?: "blue"|"emerald"|"amber"|"purple" }) => {
   const colors = {
@@ -31,35 +32,39 @@ const StepCard = ({ title, steps, color = "blue" }: { title: string, steps: {tit
   );
 };
 
-export default function MitigationTab({ data }: { data: AnalysisResult["mitigation_plan"] }) {
+export default function MitigationTab({ data, diagram }: { data: AnalysisResult["mitigation_plan"]; diagram?: string }) {
   return (
-    <div className="grid md:grid-cols-2 gap-4">
+    <DiagramLayout diagram={diagram} id="mitigation">
       <div className="space-y-4">
         <div className="p-4 bg-slate-900/50 border border-slate-700 rounded-lg">
           <h3 className="font-semibold text-slate-200 mb-1">Summary</h3>
           <p className="text-sm text-slate-300">{data.summary}</p>
         </div>
-        <StepCard title="Prepare" steps={data.immediate_mitigation.prepare} color="blue" />
-        <StepCard title="Pre-Validate" steps={data.immediate_mitigation.pre_validate} color="amber" />
-      </div>
-      <div className="space-y-4">
-        <StepCard title="Apply" steps={data.immediate_mitigation.apply} color="emerald" />
-        <StepCard title="Post-Validate" steps={data.immediate_mitigation.post_validate} color="purple" />
-        
-        <div className="p-4 border border-yellow-700/50 rounded-lg bg-yellow-950/30">
-          <h3 className="font-semibold text-yellow-300 mb-2 flex items-center gap-2"><RotateCcw className="h-4 w-4"/> Rollback Steps</h3>
-          <ol className="list-decimal list-inside text-sm text-yellow-200/80 space-y-1">
-            {data.rollback_steps.map((s,i) => <li key={i}>{s}</li>)}
-          </ol>
+        <div className="grid md:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          <StepCard title="Prepare" steps={data.immediate_mitigation.prepare} color="blue" />
+          <StepCard title="Pre-Validate" steps={data.immediate_mitigation.pre_validate} color="amber" />
         </div>
-        
-        <div className="p-4 border border-cyan-700/50 rounded-lg bg-cyan-950/30">
-          <h3 className="font-semibold text-cyan-300 mb-2 flex items-center gap-2"><Bot className="h-4 w-4"/> Agent Spec Ready</h3>
-          <pre className="text-xs text-cyan-200/80 whitespace-pre-wrap font-mono bg-black/30 p-3 rounded">
-            {data.agent_spec_ready.join("\n\n")}
-          </pre>
+        <div className="space-y-4">
+          <StepCard title="Apply" steps={data.immediate_mitigation.apply} color="emerald" />
+          <StepCard title="Post-Validate" steps={data.immediate_mitigation.post_validate} color="purple" />
+
+          <div className="p-4 border border-yellow-700/50 rounded-lg bg-yellow-950/30">
+            <h3 className="font-semibold text-yellow-300 mb-2 flex items-center gap-2"><RotateCcw className="h-4 w-4"/> Rollback Steps</h3>
+            <ol className="list-decimal list-inside text-sm text-yellow-200/80 space-y-1">
+              {data.rollback_steps.map((s,i) => <li key={i}>{s}</li>)}
+            </ol>
+          </div>
+
+          <div className="p-4 border border-cyan-700/50 rounded-lg bg-cyan-950/30">
+            <h3 className="font-semibold text-cyan-300 mb-2 flex items-center gap-2"><Bot className="h-4 w-4"/> Agent Spec Ready</h3>
+            <pre className="text-xs text-cyan-200/80 whitespace-pre-wrap font-mono bg-black/30 p-3 rounded">
+              {data.agent_spec_ready.join("\n\n")}
+            </pre>
+          </div>
+        </div>
         </div>
       </div>
-    </div>
+    </DiagramLayout>
   );
 }

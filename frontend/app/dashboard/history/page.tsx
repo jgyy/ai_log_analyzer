@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAnalysisHistory, getCurrentUser, User, type AnalysisHistory } from "@/lib/api";
 import Link from "next/link";
-import { FileText, Clock, ArrowLeft, Search } from "lucide-react";
+import { FileText, Clock, Search } from "lucide-react";
+import AppHeader from "@/components/AppHeader";
 
 export default function AnalysisHistory() {
   const [analyses, setAnalyses] = useState<AnalysisHistory[]>([]);
@@ -30,9 +31,8 @@ export default function AnalysisHistory() {
     init();
   }, [router]);
 
-  const filteredAnalyses = analyses.filter(a => 
-    a.domain.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.id.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAnalyses = analyses.filter(a =>
+    a.domain.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -43,18 +43,13 @@ export default function AnalysisHistory() {
     );
   }
 
+  if (!user) return null;
+
   return (
     <div className="min-h-screen bg-slate-950">
-      <header className="glass border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <Link href="/dashboard" className="flex items-center gap-2 text-slate-400 hover:text-slate-200">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Link>
-        </div>
-      </header>
+      <AppHeader user={user} />
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="w-full px-6 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-slate-100 mb-2">Analysis History</h1>
           <p className="text-slate-400">View all your previous log analyses</p>
@@ -65,7 +60,7 @@ export default function AnalysisHistory() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-500" />
           <input
             type="text"
-            placeholder="Search by domain or ID..."
+            placeholder="Search by domain (kubernetes, nginx, system)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -94,10 +89,7 @@ export default function AnalysisHistory() {
                     </div>
                     <div>
                       <div className="font-semibold text-slate-200 capitalize text-lg">
-                        {analysis.domain}
-                      </div>
-                      <div className="text-sm text-slate-500 font-mono">
-                        {analysis.id}
+                        {analysis.domain} Analysis
                       </div>
                     </div>
                   </div>

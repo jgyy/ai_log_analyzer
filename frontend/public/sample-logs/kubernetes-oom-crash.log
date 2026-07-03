@@ -1,0 +1,85 @@
+2026-07-03T08:00:01Z INFO  recommend-svc[-1394]: GET /api/user/profile 200 28ms
+2026-07-03T08:00:02Z INFO  search-svc[f-5f0]: GET /api/products 200 44ms
+2026-07-03T08:00:03Z INFO  search-svc[-26c8]: GET /api/search?q=shoes 200 90ms
+2026-07-03T08:00:06Z INFO  checkout-api[-1ef4]: GET /api/products 200 42ms
+2026-07-03T08:00:09Z INFO  checkout-api[-1c38]: GET /api/checkout/session 200 92ms
+2026-07-03T08:00:12Z INFO  checkout-api[-214f]: GET /api/search?q=shoes 200 25ms
+2026-07-03T08:00:15Z INFO  recommend-svc[-1b0d]: GET /api/user/profile 200 23ms
+2026-07-03T08:00:16Z INFO  kube-scheduler: HorizontalPodAutoscaler recommend-svc scaled to 6 replicas
+2026-07-03T08:00:17Z INFO  auth-svc[-20ec]: GET /api/checkout/session 200 35ms
+2026-07-03T08:00:20Z INFO  kubelet[node-worker-2]: Readiness probe succeeded for pod catalog-svc-7f6d9c8b5f-14fe
+2026-07-03T08:00:21Z INFO  search-svc[f-edb]: GET /api/products 200 35ms
+2026-07-03T08:00:25Z INFO  auth-svc[-11f6]: GET /api/cart/summary 200 44ms
+2026-07-03T08:00:26Z INFO  catalog-svc[-150a]: GET /api/recommend 200 127ms
+2026-07-03T08:00:29Z INFO  cart-svc[-23db]: GET /api/user/profile 200 73ms
+2026-07-03T08:00:31Z INFO  kubelet[node-worker-2]: Readiness probe succeeded for pod catalog-svc-7f6d9c8b5f-13b0
+2026-07-03T08:00:34Z INFO  kubelet[node-worker-5]: Readiness probe succeeded for pod recommend-svc-7f6d9c8b5f-1f53
+2026-07-03T08:00:38Z INFO  catalog-svc[f-cc2]: GET /api/cart/summary 200 111ms
+2026-07-03T08:00:39Z INFO  kubelet[node-worker-2]: Readiness probe succeeded for pod checkout-api-7f6d9c8b5f-e25
+2026-07-03T08:00:43Z INFO  search-svc[-1c88]: GET /api/search?q=shoes 200 82ms
+2026-07-03T08:00:46Z INFO  search-svc[f-b3c]: GET /api/recommend 200 111ms
+2026-07-03T08:00:49Z INFO  recommend-svc[f-b0b]: GET /api/products 200 73ms
+2026-07-03T08:00:50Z INFO  kubelet[node-worker-6]: SyncLoop (ADD): "recommend-svc-7f6d9c8b5f-14c3_prod(d30f)"
+2026-07-03T08:00:52Z INFO  kubelet[node-worker-1]: Readiness probe succeeded for pod search-svc-7f6d9c8b5f-1701
+2026-07-03T08:00:54Z INFO  cart-svc[f-e3e]: GET /api/recommend 200 132ms
+2026-07-03T08:00:55Z INFO  search-svc[-232d]: GET /api/checkout/session 200 127ms
+2026-07-03T08:00:58Z INFO  kubelet[node-worker-1]: Readiness probe succeeded for pod cart-svc-7f6d9c8b5f-1352
+2026-07-03T08:00:59Z INFO  kubelet[node-worker-6]: Readiness probe succeeded for pod checkout-api-7f6d9c8b5f-2302
+2026-07-03T08:01:01Z INFO  kubelet[node-worker-6]: SyncLoop (ADD): "cart-svc-7f6d9c8b5f-2253_prod(3a45)"
+2026-07-03T08:01:04Z INFO  kubelet[node-worker-5]: SyncLoop (ADD): "search-svc-7f6d9c8b5f-1efc_prod(fdcd)"
+2026-07-03T08:01:06Z INFO  kube-scheduler: HorizontalPodAutoscaler recommend-svc scaled to 8 replicas
+2026-07-03T08:01:10Z INFO  search-svc[f-ba6]: GET /api/cart/summary 200 58ms
+2026-07-03T08:01:11Z INFO  search-svc[-12a2]: GET /api/cart/summary 200 24ms
+2026-07-03T08:01:12Z INFO  kubelet[node-worker-1]: Readiness probe succeeded for pod cart-svc-7f6d9c8b5f-5ea
+2026-07-03T08:01:13Z INFO  search-svc[-15ba]: GET /api/products 200 84ms
+2026-07-03T08:01:15Z INFO  recommend-svc[-2228]: GET /api/search?q=shoes 200 118ms
+2026-07-03T08:01:19Z INFO  cart-svc[f-a1c]: GET /api/checkout/session 200 69ms
+2026-07-03T08:01:23Z INFO  auth-svc[f-75f]: GET /api/user/profile 200 27ms
+2026-07-03T08:01:24Z INFO  kubelet[node-worker-6]: Readiness probe succeeded for pod auth-svc-7f6d9c8b5f-199f
+2026-07-03T08:01:32Z WARN  checkout-api[x2n4q]: memory usage at 82% of limit (410Mi/500Mi)
+2026-07-03T08:01:38Z WARN  checkout-api[x2n4q]: memory usage at 89% of limit (445Mi/500Mi)
+2026-07-03T08:01:42Z WARN  checkout-api[x2n4q]: memory usage at 94% of limit (470Mi/500Mi)
+2026-07-03T08:01:48Z WARN  checkout-api[x2n4q]: memory usage at 98% of limit (490Mi/500Mi)
+2026-07-03T08:01:50Z INFO  checkout-api[x2n4q]: cache warm-up job started (promo-catalog-sync)
+2026-07-03T08:01:53Z ERROR checkout-api[x2n4q]: java.lang.OutOfMemoryError: Java heap space
+2026-07-03T08:01:53Z ERROR checkout-api[x2n4q]:   at com.acme.catalog.PromoCatalogSync.loadFullCatalog(PromoCatalogSync.java:88)
+2026-07-03T08:01:53Z ERROR checkout-api[x2n4q]:   at com.acme.catalog.PromoCatalogSync.run(PromoCatalogSync.java:41)
+2026-07-03T08:01:54Z CRITICAL kubelet[node-worker-3]: Memory cgroup out of memory: Killed process 18422 (java) total-vm:2145332kB, anon-rss:512000kB
+2026-07-03T08:01:54Z CRITICAL kubelet[node-worker-3]: Container checkout-api in pod checkout-api-7f6d9c8b5f-x2n4q terminated with reason OOMKilled, exit code 137
+2026-07-03T08:01:55Z WARN  kubelet[node-worker-3]: Back-off restarting failed container checkout-api in pod checkout-api-7f6d9c8b5f-x2n4q
+2026-07-03T08:02:07Z INFO  kube-scheduler: Pod checkout-api-7f6d9c8b5f-x2n4q rescheduled, restartCount=1
+2026-07-03T08:06:58Z WARN  checkout-api[x2n4q]: memory usage at 88% of limit (440Mi/500Mi)
+2026-07-03T08:07:01Z INFO  checkout-api[x2n4q]: cache warm-up job started (promo-catalog-sync)
+2026-07-03T08:07:31Z ERROR checkout-api[x2n4q]: java.lang.OutOfMemoryError: Java heap space
+2026-07-03T08:07:32Z CRITICAL kubelet[node-worker-3]: Container checkout-api in pod checkout-api-7f6d9c8b5f-x2n4q terminated with reason OOMKilled, exit code 137
+2026-07-03T08:07:32Z WARN  kubelet[node-worker-3]: Back-off restarting failed container checkout-api in pod checkout-api-7f6d9c8b5f-x2n4q, restartCount=2
+2026-07-03T08:12:29Z WARN  checkout-api[x2n4q]: memory usage at 88% of limit (440Mi/500Mi)
+2026-07-03T08:12:32Z INFO  checkout-api[x2n4q]: cache warm-up job started (promo-catalog-sync)
+2026-07-03T08:13:02Z ERROR checkout-api[x2n4q]: java.lang.OutOfMemoryError: Java heap space
+2026-07-03T08:13:03Z CRITICAL kubelet[node-worker-3]: Container checkout-api in pod checkout-api-7f6d9c8b5f-x2n4q terminated with reason OOMKilled, exit code 137
+2026-07-03T08:13:03Z WARN  kubelet[node-worker-3]: Back-off restarting failed container checkout-api in pod checkout-api-7f6d9c8b5f-x2n4q, restartCount=3
+2026-07-03T08:13:05Z CRITICAL kube-scheduler: Pod checkout-api-7f6d9c8b5f-x2n4q has restarted 3 times in 10 minutes, marked CrashLoopBackOff
+2026-07-03T08:13:05Z ERROR ingress-nginx: upstream checkout-api-7f6d9c8b5f-x2n4q unavailable, returning 503 to client
+2026-07-03T08:13:13Z ERROR ingress-nginx: upstream checkout-api-7f6d9c8b5f-x2n4q unavailable, returning 503 to client
+2026-07-03T08:13:33Z WARN  alertmanager: Alert firing - CheckoutAPICrashLoopBackOff (severity=critical, namespace=prod)
+2026-07-03T08:13:37Z INFO  kubelet[node-worker-1]: Readiness probe succeeded for pod cart-svc-7f6d9c8b5f-2044
+2026-07-03T08:13:38Z INFO  kubelet[node-worker-6]: Readiness probe succeeded for pod checkout-api-7f6d9c8b5f-2680
+2026-07-03T08:13:39Z INFO  cart-svc[-1dea]: GET /api/products 200 125ms
+2026-07-03T08:13:43Z INFO  checkout-api[-1c29]: GET /api/search?q=shoes 200 48ms
+2026-07-03T08:13:47Z INFO  catalog-svc[-230d]: GET /api/checkout/session 200 42ms
+2026-07-03T08:13:48Z INFO  search-svc[-269b]: GET /api/checkout/session 200 22ms
+2026-07-03T08:13:49Z INFO  kubelet[node-worker-4]: SyncLoop (ADD): "search-svc-7f6d9c8b5f-2416_prod(97f7)"
+2026-07-03T08:13:51Z INFO  kubelet[node-worker-5]: Readiness probe succeeded for pod checkout-api-7f6d9c8b5f-908
+2026-07-03T08:13:52Z INFO  search-svc[-12f5]: GET /api/recommend 200 46ms
+2026-07-03T08:13:53Z INFO  search-svc[-1ebc]: GET /api/recommend 200 81ms
+2026-07-03T08:13:56Z INFO  catalog-svc[-1803]: GET /api/search?q=shoes 200 31ms
+2026-07-03T08:13:59Z INFO  auth-svc[f-88c]: GET /api/recommend 200 87ms
+2026-07-03T08:14:00Z INFO  checkout-api[-118c]: GET /api/products 200 134ms
+2026-07-03T08:14:03Z INFO  checkout-api[-1b8e]: GET /api/search?q=shoes 200 121ms
+2026-07-03T08:14:06Z INFO  search-svc[-25c2]: GET /api/recommend 200 53ms
+2026-07-03T08:14:07Z INFO  kubelet[node-worker-3]: Readiness probe succeeded for pod cart-svc-7f6d9c8b5f-b4b
+2026-07-03T08:14:09Z INFO  kubelet[node-worker-3]: Readiness probe succeeded for pod catalog-svc-7f6d9c8b5f-1162
+2026-07-03T08:14:11Z INFO  recommend-svc[-14cd]: GET /api/checkout/session 200 130ms
+2026-07-03T08:14:12Z INFO  kubelet[node-worker-6]: Readiness probe succeeded for pod checkout-api-7f6d9c8b5f-1f03
+2026-07-03T08:14:13Z INFO  checkout-api[f-c47]: GET /api/checkout/session 200 35ms
+2026-07-03T08:14:17Z INFO  search-svc[-1f47]: GET /api/cart/summary 200 24ms

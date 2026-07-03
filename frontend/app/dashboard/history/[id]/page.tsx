@@ -3,8 +3,9 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getCurrentUser, User, apiRequest } from "@/lib/api";
 import Link from "next/link";
-import { ArrowLeft, Clock, FileText } from "lucide-react";
+import { Clock } from "lucide-react";
 import AnalysisTabs from "@/components/AnalysisTab";
+import AppHeader from "@/components/AppHeader";
 
 export default function AnalysisDetail() {
   const params = useParams();
@@ -52,30 +53,24 @@ export default function AnalysisDetail() {
     );
   }
 
+  if (!user) return null;
+
   return (
     <div className="min-h-screen bg-slate-950">
-      <header className="glass border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <Link href="/dashboard/history" className="flex items-center gap-2 text-slate-400 hover:text-slate-200">
-            <ArrowLeft className="h-4 w-4" />
-            Back to History
-          </Link>
-        </div>
-      </header>
+      <AppHeader user={user} />
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="w-full px-6 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
+              <Link href="/dashboard/history" className="text-sm text-slate-400 hover:text-slate-200 mb-1 inline-block">
+                ← Back to History
+              </Link>
               <h1 className="text-2xl font-bold text-slate-100 capitalize mb-1">
                 {analysis.domain} Analysis
               </h1>
               <div className="flex items-center gap-4 text-sm text-slate-400">
-                <span className="flex items-center gap-1">
-                  <FileText className="h-4 w-4" />
-                  {analysis.id}
-                </span>
                 <span className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
                   {new Date(analysis.created_at).toLocaleString()}

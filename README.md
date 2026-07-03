@@ -55,13 +55,17 @@ Mitigation plan page suggests possible solutions along with a rollback plan in c
 ## Installation
 
 ### 1. Backend Setup
+
+Requires Python 3.11–3.13 (pydantic-core does not yet have prebuilt wheels for 3.14; if you only have 3.14 installed, use [uv](https://docs.astral.sh/uv/) to fetch a compatible interpreter as shown below).
+
 ```bash
 cd backend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-export GEMINI_API_KEY="your-gemini-key"
-export JWT_SECRET="your-secret"
-uvicorn app.main:app --reload --port 8000
+uv venv --python 3.12 venv   # or: python -m venv venv, if you already have Python 3.11-3.13
+source venv/bin/activate.fish   # bash/zsh users: source venv/bin/activate
+uv pip install -r requirements.txt   # or: pip install -r requirements.txt
+# export GEMINI_API_KEY="your-gemini-key"
+# export JWT_SECRET="your-secret"
+uvicorn main:app --reload --port 8000
 ```
 
 ### 2. Frontend Setup

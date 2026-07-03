@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getUsers, getCurrentUser, User, deleteUser, updateUserRole, createUser } from "@/lib/api";
-import Link from "next/link";
-import { ArrowLeft, Shield, UserPlus, Trash2, X, AlertCircle } from "lucide-react";
+import { UserPlus, Trash2, X, AlertCircle } from "lucide-react";
+import AppHeader from "@/components/AppHeader";
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -105,15 +105,9 @@ export default function UserManagement() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      <header className="glass border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <Link href="/dashboard" className="flex items-center gap-2 text-slate-400 hover:text-slate-200">
-            <ArrowLeft className="h-4 w-4" /> Back to Dashboard
-          </Link>
-        </div>
-      </header>
+      <AppHeader user={currentUser} />
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="w-full px-6 py-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-100">User Management</h1>

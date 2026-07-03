@@ -32,9 +32,9 @@ export default function AnalysisTabs({ data }: { data: AnalysisResult }) {
         })}
       </div>
       <div className="p-6 min-h-[400px]">
-        {active === 0 && <TimelineTab data={data.investigation_timeline} />}
-        {active === 1 && <RootCauseTab data={data.root_cause} />}
-        {active === 2 && <MitigationTab data={data.mitigation_plan} />}
+        {active === 0 && <TimelineTab data={data.investigation_timeline} diagram={data.diagrams?.timeline_flowchart} />}
+        {active === 1 && <RootCauseTab data={data.root_cause} diagram={data.diagrams?.root_cause_diagram} />}
+        {active === 2 && <MitigationTab data={data.mitigation_plan} diagram={data.diagrams?.mitigation_flowchart} />}
       </div>
     </div>
   );

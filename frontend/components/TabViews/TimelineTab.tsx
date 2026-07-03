@@ -1,7 +1,8 @@
 import { Play, AlertCircle, Eye, Search, Target } from "lucide-react";
 import { AnalysisResult } from "@/lib/types";
+import DiagramLayout from "@/components/DiagramLayout";
 
-export default function TimelineTab({ data }: { data: AnalysisResult["investigation_timeline"] }) {
+export default function TimelineTab({ data, diagram }: { data: AnalysisResult["investigation_timeline"]; diagram?: string }) {
   const steps = [
     { key: "start" as const, label: "Start", icon: Play, color: "text-blue-400" },
     { key: "symptom" as const, label: "Symptom", icon: AlertCircle, color: "text-amber-400" },
@@ -11,7 +12,8 @@ export default function TimelineTab({ data }: { data: AnalysisResult["investigat
   ];
 
   return (
-    <div className="space-y-0">
+    <DiagramLayout diagram={diagram} id="timeline">
+      <div className="space-y-0">
       {steps.map((s, i) => (
         <div key={s.key} className="relative pl-10 pb-8 last:pb-0">
           <div className="absolute left-0 top-0 w-8 h-8 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center">
@@ -24,6 +26,7 @@ export default function TimelineTab({ data }: { data: AnalysisResult["investigat
           </p>
         </div>
       ))}
-    </div>
+      </div>
+    </DiagramLayout>
   );
 }
