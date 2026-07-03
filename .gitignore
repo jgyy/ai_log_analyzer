@@ -50,3 +50,5 @@ __pycache__
 
 # large generated stress-test logs (regenerate with sample-logs/scripts/generate_sample_logs.py)
 sample-logs/*-large.log
+.agents/
+.codex/

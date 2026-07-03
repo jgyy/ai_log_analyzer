@@ -1,4 +1,4 @@
-import { AnalysisResult } from "@/lib/types";
+import { AnalysisResult, ConnectorType } from "@/lib/types";
 let token: string | null = null;
 
 export function setToken(t: string | null) {
@@ -96,6 +96,23 @@ export async function analyzeLogs(logs: string, domain: string = 'kubernetes') {
   return apiRequest('/api/analyze', {
     method: 'POST',
     body: JSON.stringify({ logs, domain }),
+  });
+}
+
+export async function analyzeIncident(payload: { sources: ConnectorType[], logs?: string, domain?: string }) {
+  return apiRequest('/api/incidents/analyze', {
+    method: 'POST',
+    body: JSON.stringify({
+      sources: payload.sources,
+      logs: payload.logs,
+      domain: payload.domain || 'infrastructure',
+    }),
+  });
+}
+
+export async function executeAction(actionId: string) {
+  return apiRequest(`/api/actions/${encodeURIComponent(actionId)}/execute`, {
+    method: 'POST',
   });
 }
 

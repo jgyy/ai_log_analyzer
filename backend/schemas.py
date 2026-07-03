@@ -8,6 +8,23 @@ class UserRole(str, Enum):
     SRE = "sre"
     VIEWER = "viewer"
 
+class ConnectorType(str, Enum):
+    MANUAL = "manual"
+    LINUX = "linux"
+    DOCKER = "docker"
+
+class Severity(str, Enum):
+    HEALTHY = "healthy"
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+class ActionType(str, Enum):
+    RESTART_DOCKER_CONTAINER = "restart_docker_container"
+    START_DOCKER_CONTAINER = "start_docker_container"
+    STOP_DOCKER_CONTAINER = "stop_docker_container"
+    RESTART_SYSTEMD_SERVICE = "restart_systemd_service"
+
 # Auth Schemas
 class UserCreate(BaseModel):
     email: EmailStr
@@ -90,16 +107,77 @@ class AnalysisDiagrams(BaseModel):
     timeline_flowchart: str
     root_cause_diagram: str
     mitigation_flowchart: str
+    
+class SourceSummary(BaseModel):
+    source: ConnectorType
+    status: Severity = Severity.INFO
+    collected: bool = True
+    message: str = ""
+    item_count: int = 0
+
+class AffectedComponent(BaseModel):
+    name: str
+    source: ConnectorType
+    status: Severity = Severity.INFO
+    impact: str = ""
+    evidence_refs: List[str] = Field(default_factory=list)
+
+class EvidenceMetadata(BaseModel):
+    key: str
+    value: str
+
+class CollectedEvidence(BaseModel):
+    id: str
+    source: ConnectorType
+    component: str
+    severity: Severity = Severity.INFO
+    timestamp: Optional[str] = None
+    message: str
+    metadata: List[EvidenceMetadata] = Field(default_factory=list)
+
+class VisualSummary(BaseModel):
+    headline: str = "Infrastructure analysis completed"
+    likely_failure_path: List[str] = Field(default_factory=list)
+    plain_english_summary: str = ""
+    business_impact: str = ""
+    fix_summary: str = ""
+
+class ExecutableAction(BaseModel):
+    id: str
+    label: str
+    action_type: ActionType
+    target: str
+    risk_level: str = "medium"
+    preconditions: List[str] = Field(default_factory=list)
+    source: ConnectorType
+
+class ActionExecutionResponse(BaseModel):
+    action_id: str
+    status: str
+    output: str = ""
+    error: str = ""
 
 class AnalysisResult(BaseModel):
     investigation_timeline: InvestigationTimeline
     root_cause: RootCauseSection
     mitigation_plan: MitigationPlan
     diagrams: Optional[AnalysisDiagrams] = None
+    source_summary: List[SourceSummary] = Field(default_factory=list)
+    affected_components: List[AffectedComponent] = Field(default_factory=list)
+    severity: Severity = Severity.INFO
+    confidence: float = Field(default=0.5, ge=0, le=1)
+    evidence: List[CollectedEvidence] = Field(default_factory=list)
+    visual_summary: VisualSummary = Field(default_factory=VisualSummary)
+    recommended_actions: List[ExecutableAction] = Field(default_factory=list)
 
 class LogAnalysisRequest(BaseModel):
     logs: str
     domain: str = "kubernetes"
+
+class IncidentAnalysisRequest(BaseModel):
+    sources: List[ConnectorType] = Field(default_factory=lambda: [ConnectorType.MANUAL])
+    logs: Optional[str] = None
+    domain: str = "infrastructure"
 
 class LogAnalysisResponse(BaseModel):
     id: str
@@ -112,3 +190,6 @@ class LogAnalysisResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class IncidentAnalysisResponse(LogAnalysisResponse):
+    pass

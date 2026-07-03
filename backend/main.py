@@ -11,10 +11,13 @@ from database import get_db, User, Organization, LogAnalysis, AuditLog
 from schemas import (
     UserCreate, UserLogin, Token, UserResponse,
     OrganizationCreate, OrganizationResponse,
-    LogAnalysisRequest, LogAnalysisResponse, AnalysisResult
+    LogAnalysisRequest, LogAnalysisResponse, AnalysisResult,
+    IncidentAnalysisRequest, IncidentAnalysisResponse, ActionExecutionResponse
 )
 from ai_service import AIService
 from log_processor import preprocess_logs
+from connectors import collect_sources
+from actions import execute_allowlisted_action, find_action
 from auth import (
     hash_password, verify_password, create_access_token,
     get_current_user, require_role,
@@ -272,6 +275,107 @@ async def analyze_logs(
         db_analysis.status = "failed"
         db.commit()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/incidents/analyze", response_model=IncidentAnalysisResponse)
+async def analyze_incident(
+    request: IncidentAnalysisRequest,
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    logger.info("Incident analyze request received")
+    if current_user.role == "viewer":
+        raise HTTPException(status_code=403, detail="Viewers cannot run analysis")
+
+    if not request.sources:
+        raise HTTPException(status_code=400, detail="Select at least one source")
+
+    analysis_id = str(uuid.uuid4())
+    db_analysis = LogAnalysis(
+        id=analysis_id,
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
+        domain=request.domain,
+        logs_preview=(request.logs or "")[:1000],
+        status="processing"
+    )
+    db.add(db_analysis)
+    db.commit()
+
+    try:
+        collected = collect_sources(request.sources, request.logs)
+        result = await ai.analyze_incident(collected, request.domain)
+
+        db_analysis.status = "completed"
+        db_analysis.analysis_result = result.model_dump_json()
+        db.commit()
+
+        audit = AuditLog(
+            organization_id=current_user.organization_id,
+            user_id=current_user.id,
+            action="INCIDENT_ANALYSIS_COMPLETED",
+            resource_type="log_analysis",
+            resource_id=analysis_id,
+            details=f"Domain: {request.domain}, Sources: {[source.value for source in request.sources]}"
+        )
+        db.add(audit)
+        db.commit()
+
+        return IncidentAnalysisResponse(
+            id=analysis_id,
+            organization_id=current_user.organization_id,
+            user_id=current_user.id,
+            domain=request.domain,
+            created_at=db_analysis.created_at,
+            status="completed",
+            result=result
+        )
+    except Exception as e:
+        logger.exception(f"incident analysis error: {e}")
+        db_analysis.status = "failed"
+        db.commit()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/actions/{action_id}/execute", response_model=ActionExecutionResponse)
+def execute_action(
+    action_id: str,
+    current_user: UserResponse = Depends(require_role(["admin", "sre"])),
+    db: Session = Depends(get_db)
+):
+    analyses = db.query(LogAnalysis).filter(
+        LogAnalysis.organization_id == current_user.organization_id,
+        LogAnalysis.analysis_result.isnot(None)
+    ).order_by(LogAnalysis.created_at.desc()).limit(50).all()
+
+    matched_action = None
+    matched_analysis = None
+    for analysis in analyses:
+        try:
+            result = AnalysisResult.model_validate_json(analysis.analysis_result)
+        except Exception:
+            continue
+        matched_action = find_action(action_id, result.recommended_actions)
+        if matched_action:
+            matched_analysis = analysis
+            break
+
+    if not matched_action:
+        raise HTTPException(status_code=404, detail="Allowlisted action not found for this organization")
+
+    execution = execute_allowlisted_action(matched_action)
+    audit = AuditLog(
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
+        action="REMEDIATION_ACTION_EXECUTED",
+        resource_type="log_analysis",
+        resource_id=matched_analysis.id if matched_analysis else None,
+        details=(
+            f"Action: {matched_action.id}, Type: {matched_action.action_type}, "
+            f"Target: {matched_action.target}, Status: {execution.status}"
+        )
+    )
+    db.add(audit)
+    db.commit()
+    return execution
 
 @app.get("/api/analyses", response_model=List[LogAnalysisResponse])
 def list_analyses(
