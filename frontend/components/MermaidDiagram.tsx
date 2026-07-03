@@ -5,6 +5,39 @@ import { Maximize2, X } from "lucide-react";
 let mermaidInitialized = false;
 let renderCounter = 0;
 
+// Reserved words in Mermaid's flowchart grammar (e.g. "end" closes subgraphs)
+// break parsing when the AI uses them as a bare node id — rename them rather
+// than reject the whole diagram.
+const RESERVED_NODE_IDS = new Set(["end", "class", "click", "style", "subgraph", "direction"]);
+
+// AI providers occasionally wrap the diagram in a ```mermaid fence despite
+// being told not to, or emit unquoted labels containing characters
+// (parentheses, colons, pipes) that break Mermaid's flowchart grammar. Both
+// show up as "syntax error" text baked right into the rendered SVG rather
+// than as a catchable exception, so we sanitize before handing text to
+// Mermaid instead of relying solely on the AI to follow instructions.
+export function sanitizeMermaidChart(raw: string): string {
+  let chart = raw.trim();
+
+  const fenced = chart.match(/^```(?:mermaid)?\s*([\s\S]*?)\s*```$/i);
+  if (fenced) chart = fenced[1].trim();
+
+  // Matches every `id[label]` / `id(label)` / `id{label}` node definition
+  // anywhere in the text, so chains like `A[Start] --> B[OOMKilled (137)]`
+  // get every node fixed up, not just one per line.
+  chart = chart.replace(
+    /\b([A-Za-z0-9_-]+)(\[|\(|\{)"?(.*?)"?(\]|\)|\})(?=\s|-->|$)/g,
+    (full, nodeId, open, text, close) => {
+      const safeId = RESERVED_NODE_IDS.has(nodeId.toLowerCase()) ? `${nodeId}_node` : nodeId;
+      const needsQuotes = /["():{}|;]/.test(text);
+      const safeText = needsQuotes ? `"${text.replace(/"/g, "'")}"` : text;
+      return `${safeId}${open}${safeText}${close}`;
+    }
+  );
+
+  return chart;
+}
+
 async function renderInto(container: HTMLDivElement, chart: string, id: string): Promise<{ width: number; height: number } | null> {
   const mermaid = (await import("mermaid")).default;
   if (!mermaidInitialized) {
@@ -22,7 +55,7 @@ async function renderInto(container: HTMLDivElement, chart: string, id: string):
   // succession with the same id, and the second call silently returns an
   // empty/invalid diagram. A per-call unique id sidesteps that entirely.
   const uniqueId = `${id}-${++renderCounter}`;
-  const { svg } = await mermaid.render(uniqueId, chart.trim());
+  const { svg } = await mermaid.render(uniqueId, sanitizeMermaidChart(chart));
   container.innerHTML = svg;
 
   const viewBox = container.querySelector("svg")?.getAttribute("viewBox");
@@ -92,7 +125,7 @@ export default function MermaidDiagram({ chart, id, onAspectRatio }: { chart: st
 
       {expanded && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6"
           onClick={() => setExpanded(false)}
         >
           <div

@@ -3,12 +3,48 @@ from google.genai import types as genai_types
 from anthropic import AsyncAnthropic
 from schemas import AnalysisResult
 import os
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
 
 GEMINI_DEFAULT_MODEL = "gemini-2.5-flash-lite"
 CLAUDE_DEFAULT_MODEL = "claude-sonnet-5"
+MAX_DIAGRAM_ATTEMPTS = 3
+
+# Mirrors the checks the frontend's sanitizer (frontend/components/MermaidDiagram.tsx)
+# runs defensively before rendering — used here to catch bad diagrams *before*
+# they leave the backend and ask the model to regenerate them instead.
+_RESERVED_NODE_IDS = {"end", "class", "click", "style", "subgraph", "direction"}
+_NODE_DEF_RE = re.compile(r'\b([A-Za-z0-9_-]+)(\[|\(|\{)"?(.*?)"?(\]|\)|\})(?=\s|-->|$)')
+
+
+def _diagram_issues(chart: str) -> list[str]:
+    issues = []
+    text = (chart or "").strip()
+    if not text:
+        return issues
+    if text.startswith("```"):
+        issues.append("diagram is wrapped in a markdown code fence (```) — return plain Mermaid source only")
+    for node_id, _open, label, _close in _NODE_DEF_RE.findall(text):
+        if node_id.lower() in _RESERVED_NODE_IDS:
+            issues.append(f'node id "{node_id}" is a reserved Mermaid keyword and cannot be used as a node id')
+        if re.search(r'["():{}|;]', label) and not (label.startswith('"') and label.endswith('"')):
+            issues.append(f'label {label!r} contains special characters and must be wrapped in double quotes')
+    return issues
+
+
+def _all_diagram_issues(result: AnalysisResult) -> list[str]:
+    if not result.diagrams:
+        return []
+    issues = []
+    for name, chart in (
+        ("timeline_flowchart", result.diagrams.timeline_flowchart),
+        ("root_cause_diagram", result.diagrams.root_cause_diagram),
+        ("mitigation_flowchart", result.diagrams.mitigation_flowchart),
+    ):
+        issues += [f"{name}: {issue}" for issue in _diagram_issues(chart)]
+    return issues
 
 class AIService:
     def __init__(self, provider: str = None, model_name: str = None):
@@ -34,14 +70,30 @@ In addition to the written analysis, populate the "diagrams" object with three v
 - root_cause_diagram: a Mermaid flowchart showing how the root cause(s) and hypotheses lead to the observed impact (e.g. root causes and hypotheses as nodes flowing into an "Impact" node).
 - mitigation_flowchart: a Mermaid flowchart of the mitigation phases (Prepare → Pre-Validate → Apply → Post-Validate), with key step titles as short labels, including a rollback branch.
 
-Keep node labels short (under 8 words) and always wrap node text in quotes if it contains special characters like parentheses or colons.
+Keep node labels short (under 8 words) and always wrap node text in quotes if it contains special characters like parentheses or colons. Never use a Mermaid reserved word (e.g. "end", "class", "click", "style", "subgraph") as a bare node id.
 
 Logs:
 {logs}
 """
-        if self.provider == "gemini":
-            return await self._analyze_with_gemini(prompt)
-        return await self._analyze_with_claude(prompt)
+        result = None
+        for attempt in range(MAX_DIAGRAM_ATTEMPTS):
+            result = (
+                await self._analyze_with_gemini(prompt)
+                if self.provider == "gemini"
+                else await self._analyze_with_claude(prompt)
+            )
+            issues = _all_diagram_issues(result)
+            if not issues:
+                return result
+            if attempt < MAX_DIAGRAM_ATTEMPTS - 1:
+                prompt += (
+                    "\n\nYour previous attempt's Mermaid diagrams had syntax problems. Regenerate ALL THREE "
+                    "diagrams from scratch, fixing every issue below:\n- " + "\n- ".join(issues)
+                )
+        # Ran out of attempts — return the last (still imperfect) result; the
+        # frontend sanitizer is a final safety net that fixes these same
+        # classes of issues before rendering.
+        return result
 
     async def _analyze_with_gemini(self, prompt: str) -> AnalysisResult:
         response = await self.client.aio.models.generate_content(
