@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Maximize2, X } from "lucide-react";
 
 let mermaidInitialized = false;
@@ -70,6 +71,9 @@ export default function MermaidDiagram({ chart, id, onAspectRatio }: { chart: st
   const modalContainerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,7 +127,7 @@ export default function MermaidDiagram({ chart, id, onAspectRatio }: { chart: st
         )}
       </button>
 
-      {expanded && (
+      {expanded && mounted && createPortal(
         <div
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6"
           onClick={() => setExpanded(false)}
@@ -140,7 +144,8 @@ export default function MermaidDiagram({ chart, id, onAspectRatio }: { chart: st
             </button>
             <div ref={modalContainerRef} className="w-full h-full flex items-center justify-center [&_svg]:w-auto [&_svg]:h-auto [&_svg]:max-w-full [&_svg]:max-h-full" />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
