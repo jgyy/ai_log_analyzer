@@ -13,10 +13,12 @@ AI system was successful in identifying root cause from a set of logs related to
 ## Demo
 ### Product Screenshots
 ### Home page
-<img width="1261" height="744" alt="image" src="https://github.com/user-attachments/assets/af702089-d325-4a5b-8e22-a3dced4cac1d" />
+![Home page](image-1.png)
 
-1. Log files can be uploaded (currently support .log and .txt files) or logs can be pasted in the text input section.
-2. Click on Run AI analyzer button
+1. Manual and automated log analysis methods
+    a. Manual method    - Log file (support .log or .txt files) can either be uploaded or logs can directly be pasted into the text box
+    b. Automatic method - Linux (host machine) or Docker related logs can be automatically fetched by the application 
+2. Click on Analyze button
 
 ### Analysis
 <img width="1290" height="758" alt="image" src="https://github.com/user-attachments/assets/8c1c82ce-4730-41f1-b0e4-db651a7cef99" />
@@ -32,6 +34,11 @@ Root cause identification page displays more details about the root cause, possi
 <img width="1270" height="772" alt="image" src="https://github.com/user-attachments/assets/c6ae3e26-9485-417d-b790-c68a4e32334c" />
 
 Mitigation plan page suggests possible solutions along with a rollback plan in case the suggested solution does not work as expected.
+
+### Execute actions
+DevOps engineers can execute recommended commands from the tool. Currently, the AI model does not have access to directly execute commands and only executes them when a user approves it
+
+![Execute actions](image.png)
 
 ### AI-generated diagrams
 Each of the three analysis tabs (Investigation Timeline, Root Cause, Mitigation Plan) is paired with an AI-generated [Mermaid](https://mermaid.js.org/) flowchart that visualizes the same content — click any diagram to expand it. The backend validates the AI's Mermaid output and asks the model to regenerate it (up to 3 attempts) if it finds syntax problems, and the frontend applies a defensive sanitizer as a final safety net before rendering.
