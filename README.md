@@ -33,24 +33,41 @@ Root cause identification page displays more details about the root cause, possi
 
 Mitigation plan page suggests possible solutions along with a rollback plan in case the suggested solution does not work as expected.
 
+### AI-generated diagrams
+Each of the three analysis tabs (Investigation Timeline, Root Cause, Mitigation Plan) is paired with an AI-generated [Mermaid](https://mermaid.js.org/) flowchart that visualizes the same content — click any diagram to expand it. The backend validates the AI's Mermaid output and asks the model to regenerate it (up to 3 attempts) if it finds syntax problems, and the frontend applies a defensive sanitizer as a final safety net before rendering.
+
 ## Tech Stack
------------------------------------------------
-| Layer       | Tech                          |
-|-------------|-------------------------------|
-| Frontend    | Next.js 14, Tailwind, React   |
-| Backend     | FastAPI, Pydantic, Uvicorn    |
-| AI/ML       | Google Generative AI (Gemini) |
-| Auth        | JWT Header-based (MVP)        |
------------------------------------------------
+------------------------------------------------------------------
+| Layer       | Tech                                             |
+|-------------|--------------------------------------------------|
+| Frontend    | Next.js 14, Tailwind, React, Mermaid              |
+| Backend     | FastAPI, Pydantic, Uvicorn                        |
+| AI/ML       | Google Gemini and Anthropic Claude (switchable)   |
+| Auth        | JWT Header-based (MVP)                            |
+------------------------------------------------------------------
 
 ## Architecture
-[UI: Next.js] → (Paste/Upload Logs) → [Backend: FastAPI] → (Preprocess & Chunk) → [AI Engine] → (Structured JSON) → [UI Tabs]
+[UI: Next.js] → (Paste/Upload Logs) → [Backend: FastAPI] → (Preprocess & Chunk) → [AI Engine] → (Structured JSON + Mermaid diagrams) → [UI Tabs]
 
-- **Frontend**: Next.js + Tailwind + Lucide Icons
+- **Frontend**: Next.js + Tailwind + Lucide Icons + Mermaid diagram rendering
 - **Backend**: FastAPI + Pydantic validation + JWT Role Check
-- **AI Layer**: Google Gemini (JSON schema enforced) + Extensible Model Router
+- **AI Layer**: Gemini or Claude (`AI_PROVIDER` env var, JSON schema / tool-use enforced) with Mermaid diagram validation and regeneration on syntax errors
 - **Log Preprocessor**: Log parsing using Drain3, Context-aware chunking, error sampling, deduplication
-- **Output**: Strict Pydantic schema mapped to 3 exact UI tabs
+- **Output**: Strict Pydantic schema mapped to 3 exact UI tabs, each with a companion diagram
+
+```mermaid
+flowchart LR
+    U["User: paste/upload logs"] --> FE["Next.js frontend"]
+    FE --> BE["FastAPI backend"]
+    BE --> PP["Log preprocessor (Drain3)"]
+    PP --> AI["AI provider (Gemini or Claude)"]
+    AI -->|"analysis + Mermaid diagrams"| VAL{"Diagrams valid?"}
+    VAL -->|"no, retry up to 3x"| AI
+    VAL -->|"yes"| BE
+    BE --> FE
+    FE --> SAN["Client-side Mermaid sanitizer"]
+    SAN --> TABS["Timeline / Root Cause / Mitigation tabs"]
+```
 
 ## Installation
 
@@ -63,7 +80,9 @@ cd backend
 uv venv --python 3.12 venv   # or: python -m venv venv, if you already have Python 3.11-3.13
 source venv/bin/activate.fish   # bash/zsh users: source venv/bin/activate
 uv pip install -r requirements.txt   # or: pip install -r requirements.txt
+# export AI_PROVIDER="gemini"   # or "claude"
 # export GEMINI_API_KEY="your-gemini-key"
+# export ANTHROPIC_API_KEY="your-anthropic-key"
 # export JWT_SECRET="your-secret"
 uvicorn main:app --reload --port 8000
 ```
@@ -109,14 +128,18 @@ ai_log_analyzer/
 │   │   ├── login                              # Login page
 │   │   │   └── page.tsx
 │   │   └── page.tsx
-│   ├── components                            # UI Components for frontend
-│   │   ├── AnalysisTab.tsx
-│   │   ├── LogInput.tsx
-│   │   ├── LogUploader.tsx
-│   │   └── TabViews
-│   │       ├── MitigationTab.tsx
-│   │       ├── RootCauseTab.tsx
-│   │       └── TimelineTab.tsx
+│   ├── components                            # UI Components for frontend
+│   │   ├── AnalysisTab.tsx
+│   │   ├── AppHeader.tsx
+│   │   ├── ClampedText.tsx
+│   │   ├── DiagramLayout.tsx                # Sidebar/banner layout for a tab's diagram
+│   │   ├── LogInput.tsx
+│   │   ├── LogUploader.tsx
+│   │   ├── MermaidDiagram.tsx               # Renders + sanitizes AI-generated Mermaid diagrams
+│   │   └── TabViews
+│   │       ├── MitigationTab.tsx
+│   │       ├── RootCauseTab.tsx
+│   │       └── TimelineTab.tsx
 │   ├── lib
 │   │   ├── api.ts                           
 │   │   └── types.ts
