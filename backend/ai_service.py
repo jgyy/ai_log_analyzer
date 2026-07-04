@@ -14,11 +14,15 @@ from schemas import (
 import os
 import json
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
 
-GEMINI_DEFAULT_MODEL = "gemini-2.5-flash-lite"
-CLAUDE_DEFAULT_MODEL = "claude-sonnet-5"
+logger  = logging.getLogger(__name__)
+
+GEMINI_DEFAULT_MODEL    = "gemini-2.5-flash-lite"
+GEMINI_BACKUP_MODEL     = "gemini-2.5-flash"
+CLAUDE_DEFAULT_MODEL    = "claude-sonnet-5"
 
 class AIService:
     def __init__(self, provider: str = None, model_name: str = None):
@@ -55,16 +59,21 @@ Logs:
         return await self._analyze_with_claude(prompt)
 
     async def _analyze_with_gemini(self, prompt: str) -> AnalysisResult:
-        response = await self.client.aio.models.generate_content(
-            model=self.model_name,
-            contents=prompt,
-            config=genai_types.GenerateContentConfig(
-                temperature=0.2,
-                response_mime_type="application/json",
-                response_schema=AnalysisResult,  # Pass the Pydantic class directly
-            ),
-        )
-        return AnalysisResult.model_validate_json(response.text)
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config=genai_types.GenerateContentConfig(
+                        temperature=0.2,
+                        response_mime_type="application/json",
+                        response_schema=AnalysisResult,  # Pass the Pydantic class directly
+                    ),
+                )
+                return AnalysisResult.model_validate_json(response.text)
+            except Exception as e:
+                logger.error(f"status: {e.code} | {e.response}")
+                self.model_name = GEMINI_BACKUP_MODEL
+                raise
 
     async def _analyze_with_claude(self, prompt: str) -> AnalysisResult:
         response = await self.client.messages.create(
@@ -104,6 +113,16 @@ Logs:
         prompt = f"""
 You are an expert DevOps SRE incident analyst.
 Analyze this local {domain} evidence and return STRICT JSON matching the schema.
+Focus on evidence-based reasoning. If logs are insufficient, clearly state it in investigation_gaps.
+Do NOT include markdown formatting in text fields. Return ONLY raw JSON.
+
+In addition to the written analysis, populate the "diagrams" object with three valid Mermaid diagrams (as plain Mermaid source text, no markdown code fences) that visualize the SAME content you wrote — the diagrams and text must tell the same story, just in different forms:
+- timeline_flowchart: a Mermaid flowchart (flowchart TD) with one node per investigation stage (Start, Symptom, Observation, Finding, Root Cause), each node's label summarizing that stage in a few words, connected in sequence.
+- root_cause_diagram: a Mermaid flowchart showing how the root cause(s) and hypotheses lead to the observed impact (e.g. root causes and hypotheses as nodes flowing into an "Impact" node).
+- mitigation_flowchart: a Mermaid flowchart of the mitigation phases (Prepare → Pre-Validate → Apply → Post-Validate), with key step titles as short labels, including a rollback branch.
+
+Keep node labels short (under 8 words) and always wrap node text in quotes if it contains special characters like parentheses or colons.
+Keep executable actions empty unless the backend provides them. Mitigation commands are advisory text only.
 
 Rules:
 - Base root cause, hypotheses, impact, and mitigation on the evidence ids provided.
@@ -116,18 +135,41 @@ Rules:
 Structured incident evidence:
 {json.dumps(payload, default=str)[:50000]}
 """
-        response = await self.client.aio.models.generate_content(
-            model=self.model_name,
-            contents=prompt,
-            config=genai_types.GenerateContentConfig(
-                temperature=0.2,
-                response_mime_type="application/json",
-                response_schema=AnalysisResult,
-            ),
-        )
+        MAX_RETRIES = 3
+        for attempt in range(MAX_RETRIES):
+            try:
+                if self.provider == "gemini":
+                    response = await self._analyze_with_gemini(prompt)
+                else:
+                    response = await self._analyze_with_claude(prompt)
+                logger.info(f"Model: {self.model_name} | response: {response}")
+                # result = AnalysisResult.model_validate_json(response.text)
+                return self.with_connector_context(response, collected)
+            except Exception as e:
+                # Need to add a delay for 429 - Currently no delay as retrying with another model
+                logger.error(f"attempt: {attempt} | error: {e}")
+                if attempt == MAX_RETRIES - 1:
+                    logger.error("Max retries reached")
+                    raise
+                e_code      = getattr(e, "code", None)
+                e_status    = getattr(e, "status", None)
+                if (e_code == 503 or (e_code == 429 and e_status == "RESOURCE_EXHAUSTED")):
+                    logger.info("Switching to backup Gemini model")
+                    self.model_name = GEMINI_BACKUP_MODEL
 
-        result = AnalysisResult.model_validate_json(response.text)
-        return self.with_connector_context(result, collected)
+                
+        # response = await self.client.aio.models.generate_content(
+        #     model=self.model_name,
+        #     contents=prompt,
+        #     config=genai_types.GenerateContentConfig(
+        #         temperature=0.2,
+        #         response_mime_type="application/json",
+        #         response_schema=AnalysisResult,
+        #     ),
+        # )
+        # logger.info(f"Model: {self.model_name} | response: {response}")
+        # result = AnalysisResult.model_validate_json(response.text)
+        # return self.with_connector_context(result, collected)
 
     def with_connector_context(self, result: AnalysisResult, collected: dict) -> AnalysisResult:
         result.source_summary = collected["source_summary"]

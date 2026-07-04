@@ -41,7 +41,9 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [loadingSample, setLoadingSample] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  const selected = useMemo(() => presets.find((item) => item.id === preset) || presets[0], [preset]);
+  const manualRequired = selected.sources.includes("manual");
+  
     const handleLoadSample = async (sample: typeof SAMPLE_LOGS[number]) => {
     setLoadingSample(sample.file);
     setError(null);
@@ -66,9 +68,6 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
 
   const statusMessage = [...STATUS_STAGES].reverse().find((s) => elapsedSeconds >= s.atSeconds)?.message
     ?? STATUS_STAGES[0].message;
-
-  const selected = useMemo(() => presets.find((item) => item.id === preset) || presets[0], [preset]);
-  const manualRequired = selected.sources.includes("manual");
 
   const handleSubmit = async () => {
     if (manualRequired && !logs.trim()) {
@@ -127,52 +126,7 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
           Pull local Linux and Docker evidence, structure it for AI analysis, and generate an explainable mitigation plan.
         </p>
       </header>
-      <div className="glass rounded-xl p-6 space-y-4 card-hover">
-        <div>
-          <p className="text-sm text-slate-400 mb-2 flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-blue-400" /> New here? Try a sample incident:
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {SAMPLE_LOGS.map((sample) => (
-              <button
-                key={sample.file}
-                disabled={loading || !!loadingSample}
-                onClick={() => handleLoadSample(sample)}
-                className="px-3 py-1.5 text-xs rounded-lg border border-slate-700 bg-slate-800/60 text-slate-300 hover:border-blue-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
-              >
-                {loadingSample === sample.file && <Loader2 className="h-3 w-3 animate-spin" />}
-                {sample.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div
-          className={`border-2 border-dashed border-slate-600 rounded-lg p-8 text-center transition-colors ${
-            loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:border-blue-500"
-          }`}
-          onClick={() => !loading && fileInputRef.current?.click()}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => { e.preventDefault(); if (!loading) handleFileUpload({ target: { files: e.dataTransfer.files } } as any); }}
-        >
-          <Upload className="mx-auto h-8 w-8 text-slate-500 mb-3" />
-          <p className="text-slate-300 font-medium">Drag & drop .log / .txt file</p>
-          <p className="text-slate-500 text-sm mt-1">or click to browse</p>
-          <input ref={fileInputRef} type="file" accept=".log,.txt" className="hidden" onChange={handleFileUpload} disabled={loading} />
-        </div>
-
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-slate-400">Log domain:</span>
-          <select
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
-            className="bg-slate-900/50 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="kubernetes">Kubernetes</option>
-            <option value="nginx">Nginx</option>
-            <option value="system">System</option>
-          </select>
-        </div>
+      <div>
         <div className="glass rounded-xl p-6 space-y-5 card-hover">
           <div>
             <div className="mb-3 text-sm font-medium text-slate-300">Evidence source</div>
@@ -199,18 +153,51 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
 
           {manualRequired && (
             <div className="space-y-4">
-              <div
-                className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => { e.preventDefault(); handleFileUpload({ target: { files: e.dataTransfer.files } } as any); }}
-              >
-                <Upload className="mx-auto h-8 w-8 text-slate-500 mb-3" />
-                <p className="text-slate-300 font-medium">Drag & drop .log / .txt file</p>
-                <p className="text-slate-500 text-sm mt-1">or click to browse</p>
-                <input ref={fileInputRef} type="file" accept=".log,.txt" className="hidden" onChange={handleFileUpload} />
+              <div>
+              <p className="text-sm text-slate-400 mb-2 flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-blue-400" /> New here? Try a sample incident:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {SAMPLE_LOGS.map((sample) => (
+                  <button
+                    key={sample.file}
+                    disabled={loading || !!loadingSample}
+                    onClick={() => handleLoadSample(sample)}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-slate-700 bg-slate-800/60 text-slate-300 hover:border-blue-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                  >
+                    {loadingSample === sample.file && <Loader2 className="h-3 w-3 animate-spin" />}
+                    {sample.label}
+                  </button>
+                ))}
               </div>
+            </div>
 
+            <div
+              className={`border-2 border-dashed border-slate-600 rounded-lg p-8 text-center transition-colors ${
+                loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:border-blue-500"
+              }`}
+              onClick={() => !loading && fileInputRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); if (!loading) handleFileUpload({ target: { files: e.dataTransfer.files } } as any); }}
+            >
+              <Upload className="mx-auto h-8 w-8 text-slate-500 mb-3" />
+              <p className="text-slate-300 font-medium">Drag & drop .log / .txt file</p>
+              <p className="text-slate-500 text-sm mt-1">or click to browse</p>
+              <input ref={fileInputRef} type="file" accept=".log,.txt" className="hidden" onChange={handleFileUpload} disabled={loading} />
+            </div>
+
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-slate-400">Log domain:</span>
+              <select
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                className="bg-slate-900/50 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="kubernetes">Kubernetes</option>
+                <option value="nginx">Nginx</option>
+                <option value="system">System</option>
+              </select>
+            </div>
               <div className="relative">
                 <textarea
                   value={logs}

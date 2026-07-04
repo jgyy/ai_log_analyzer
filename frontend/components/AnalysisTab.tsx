@@ -10,11 +10,11 @@ import MitigationTab from "./TabViews/MitigationTab";
 export default function AnalysisTabs({ data }: { data: AnalysisResult }) {
   const [active, setActive] = useState(0);
   const tabs = [
-    { id: 0, label: "Overview", icon: Activity },
-    { id: 1, label: "Investigation Timeline", icon: Clock },
-    { id: 2, label: "Root Cause", icon: AlertTriangle },
-    { id: 3, label: "Mitigation Plan", icon: Wrench },
+    { id: 0, label: "Investigation Timeline", icon: Clock },
+    { id: 1, label: "Root Cause", icon: AlertTriangle },
+    { id: 2, label: "Mitigation Plan", icon: Wrench },
   ];
+  console.log(`data: ${JSON.stringify(data)}`)
 
   return (
     <div className="glass rounded-xl overflow-hidden">
