@@ -162,5 +162,33 @@ ai_log_analyzer/
 └── README.md
 ```
 
+## Testing
+
+The backend has a `pytest` suite covering log preprocessing, authentication, and the incident connectors/actions pipeline. Tests run automatically in CI on every push and pull request via GitHub Actions (`.github/workflows/backend-tests.yml`).
+
+```mermaid
+flowchart TD
+    PR["Push / Pull Request"] --> CI["GitHub Actions: backend-tests.yml"]
+    CI --> DEPS["Install backend/requirements.txt + pytest"]
+    DEPS --> RUN["pytest -v"]
+    RUN --> LP["test_log_processor.py\n(log chunking, dedup, error-context capture)"]
+    RUN --> AU["test_auth.py\n(password hashing, JWT issuance/verification)"]
+    RUN --> INC["test_incident_mvp.py\n(Linux/Docker connectors, allowlisted actions)"]
+    LP --> RESULT{"All green?"}
+    AU --> RESULT
+    INC --> RESULT
+    RESULT -->|yes| MERGE["Safe to merge"]
+    RESULT -->|no| BLOCK["Fix before merge"]
+```
+
+Run locally:
+
+```bash
+cd backend
+source venv/bin/activate   # bash/zsh, or activate.fish for fish
+pip install pytest
+pytest -v
+```
+
 ## Reflection
 The primary goal of this project was to build a system that can perform analysis of logs and share detailed results with regards to root cause analysis and mitigation plan. This was successfully achieved. This also encouraged in taking further steps in implementing features like Solution documentation creation and identifying ways to reduce the load off engineers during outages.
