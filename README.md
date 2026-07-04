@@ -163,4 +163,17 @@ ai_log_analyzer/
 ```
 
 ## Reflection
-The primary goal of this project was to build a system that can perform analysis of logs and share detailed results with regards to root cause analysis and mitigation plan. This was successfully achieved. This also encouraged in taking further steps in implementing features like Solution documentation creation and identifying ways to reduce the load off engineers during outages.
+
+### What worked
+
+The primary goal of this project was to build a system that can perform analysis of logs and share detailed results with regards to root cause analysis and mitigation plan. This was successfully achieved — the AI system correctly identified root causes from Kubernetes, system, and Nginx logs and produced actionable mitigation plans with rollback options. Routing remediation through an allowlist rather than giving the model shell access kept the "execute actions" feature usable without turning it into an unreviewed command-execution surface.
+
+### Known limitations (current MVP scope)
+
+- **Connectors are local-only.** Automated log collection targets the host machine or local Docker daemon; there is no SSH, Kubernetes API, or cloud-provider (CloudWatch/Stackdriver) connector yet. See `ARCHITECTURE.md`'s "Future Connector Ideas" for the planned Kubernetes/cloud connector shapes.
+- **Analysis runs synchronously.** A large log analysis blocks the HTTP request until the AI provider responds; there's no background job queue yet for long-running or batched analyses.
+- **Tested mainly against Kubernetes-style logs.** Nginx and system log support exists but has seen less real-world validation than the Kubernetes path.
+
+### Next steps
+
+Solution documentation generation (turning a resolved incident into a runbook) and expanding connectors to reduce on-call engineer load further, per the roadmap in `PLAN.md`.
