@@ -1,26 +1,37 @@
 from google import genai
 from anthropic import AsyncAnthropic
-from schemas import AnalysisResult
 from google.genai import types as genai_types
 from schemas import (
     AffectedComponent,
     AnalysisResult,
     CollectedEvidence,
-    ExecutableAction,
     Severity,
-    SourceSummary,
     VisualSummary,
 )
 import os
 import json
 import re
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
 
-GEMINI_DEFAULT_MODEL = "gemini-2.5-flash-lite"
-CLAUDE_DEFAULT_MODEL = "claude-sonnet-5"
+logger  = logging.getLogger(__name__)
+
+GEMINI_DEFAULT_MODEL    = "gemini-2.5-flash-lite"
+GEMINI_BACKUP_MODEL     = "gemini-2.5-flash"
+CLAUDE_DEFAULT_MODEL    = "claude-sonnet-5"
 MAX_DIAGRAM_ATTEMPTS = 3
+MAX_AI_API_ATTEMPTS = 3
+
+DIAGRAM_INSTRUCTIONS = """
+In addition to the written analysis, populate the "diagrams" object with three valid Mermaid diagrams (as plain Mermaid source text, no markdown code fences) that visualize the SAME content you wrote - the diagrams and text must tell the same story, just in different forms:
+- timeline_flowchart: a Mermaid flowchart (flowchart TD) with one node per investigation stage (Start, Symptom, Observation, Finding, Root Cause), each node's label summarizing that stage in a few words, connected in sequence.
+- root_cause_diagram: a Mermaid flowchart showing how the root cause(s) and hypotheses lead to the observed impact (e.g. root causes and hypotheses as nodes flowing into an "Impact" node).
+- mitigation_flowchart: a Mermaid flowchart of the mitigation phases (Prepare -> Pre-Validate -> Apply -> Post-Validate), with key step titles as short labels, including a rollback branch.
+
+Keep node labels short (under 8 words) and always wrap node text in quotes if it contains special characters like parentheses or colons. Never use a Mermaid reserved word (e.g. "end", "class", "click", "style", "subgraph", "direction") as a bare node id.
+"""
 
 # Mirrors the checks the frontend's sanitizer (frontend/components/MermaidDiagram.tsx)
 # runs defensively before rendering — used here to catch bad diagrams *before*
@@ -75,36 +86,13 @@ You are an expert DevOps SRE. Analyze the following {domain} logs and return a S
 Focus on evidence-based reasoning. If logs are insufficient, clearly state it in investigation_gaps.
 Do NOT include markdown formatting in text fields. Return ONLY raw JSON.
 
-In addition to the written analysis, populate the "diagrams" object with three valid Mermaid diagrams (as plain Mermaid source text, no markdown code fences) that visualize the SAME content you wrote — the diagrams and text must tell the same story, just in different forms:
-- timeline_flowchart: a Mermaid flowchart (flowchart TD) with one node per investigation stage (Start, Symptom, Observation, Finding, Root Cause), each node's label summarizing that stage in a few words, connected in sequence.
-- root_cause_diagram: a Mermaid flowchart showing how the root cause(s) and hypotheses lead to the observed impact (e.g. root causes and hypotheses as nodes flowing into an "Impact" node).
-- mitigation_flowchart: a Mermaid flowchart of the mitigation phases (Prepare → Pre-Validate → Apply → Post-Validate), with key step titles as short labels, including a rollback branch.
-
-Keep node labels short (under 8 words) and always wrap node text in quotes if it contains special characters like parentheses or colons. Never use a Mermaid reserved word (e.g. "end", "class", "click", "style", "subgraph") as a bare node id.
+{DIAGRAM_INSTRUCTIONS}
 Keep executable actions empty unless the backend provides them. Mitigation commands are advisory text only.
 
 Logs:
 {logs}
 """
-        result = None
-        for attempt in range(MAX_DIAGRAM_ATTEMPTS):
-            result = (
-                await self._analyze_with_gemini(prompt)
-                if self.provider == "gemini"
-                else await self._analyze_with_claude(prompt)
-            )
-            issues = _all_diagram_issues(result)
-            if not issues:
-                return result
-            if attempt < MAX_DIAGRAM_ATTEMPTS - 1:
-                prompt += (
-                    "\n\nYour previous attempt's Mermaid diagrams had syntax problems. Regenerate ALL THREE "
-                    "diagrams from scratch, fixing every issue below:\n- " + "\n- ".join(issues)
-                )
-        # Ran out of attempts — return the last (still imperfect) result; the
-        # frontend sanitizer is a final safety net that fixes these same
-        # classes of issues before rendering.
-        return result
+        return await self._run_analysis(prompt)
 
     async def _analyze_with_gemini(self, prompt: str) -> AnalysisResult:
         response = await self.client.aio.models.generate_content(
@@ -113,7 +101,7 @@ Logs:
             config=genai_types.GenerateContentConfig(
                 temperature=0.2,
                 response_mime_type="application/json",
-                response_schema=AnalysisResult,  # Pass the Pydantic class directly
+                response_schema=AnalysisResult,
             ),
         )
         return AnalysisResult.model_validate_json(response.text)
@@ -156,6 +144,11 @@ Logs:
         prompt = f"""
 You are an expert DevOps SRE incident analyst.
 Analyze this local {domain} evidence and return STRICT JSON matching the schema.
+Focus on evidence-based reasoning. If logs are insufficient, clearly state it in investigation_gaps.
+Do NOT include markdown formatting in text fields. Return ONLY raw JSON.
+
+{DIAGRAM_INSTRUCTIONS}
+Keep executable actions empty unless the backend provides them. Mitigation commands are advisory text only.
 
 Rules:
 - Base root cause, hypotheses, impact, and mitigation on the evidence ids provided.
@@ -168,18 +161,60 @@ Rules:
 Structured incident evidence:
 {json.dumps(payload, default=str)[:50000]}
 """
-        response = await self.client.aio.models.generate_content(
-            model=self.model_name,
-            contents=prompt,
-            config=genai_types.GenerateContentConfig(
-                temperature=0.2,
-                response_mime_type="application/json",
-                response_schema=AnalysisResult,
-            ),
+        result = await self._run_analysis(prompt)
+        logger.info(f"Model: {self.model_name} | response: {result}")
+        return self.with_connector_context(result, collected)
+
+    async def _run_analysis(self, prompt: str) -> AnalysisResult:
+        result = None
+        current_prompt = prompt
+        for attempt in range(MAX_DIAGRAM_ATTEMPTS):
+            result = await self._call_model_with_retries(current_prompt)
+            issues = _all_diagram_issues(result)
+            if not issues:
+                return result
+            if attempt < MAX_DIAGRAM_ATTEMPTS - 1:
+                current_prompt += (
+                    "\n\nYour previous attempt's Mermaid diagrams had syntax problems. Regenerate ALL THREE "
+                    "diagrams from scratch, fixing every issue below:\n- " + "\n- ".join(issues)
+                )
+
+        return result
+
+    async def _call_model_with_retries(self, prompt: str) -> AnalysisResult:
+        for attempt in range(MAX_AI_API_ATTEMPTS):
+            try:
+                return (
+                    await self._analyze_with_gemini(prompt)
+                    if self.provider == "gemini"
+                    else await self._analyze_with_claude(prompt)
+                )
+            except Exception as e:
+                self._log_ai_error(attempt, e)
+                if attempt == MAX_AI_API_ATTEMPTS - 1 or not self._should_retry_ai_error(e):
+                    raise
+                if self.provider == "gemini":
+                    logger.info("Switching to backup Gemini model")
+                    self.model_name = GEMINI_BACKUP_MODEL
+
+        raise RuntimeError("AI analysis failed after all retry attempts")
+
+    def _log_ai_error(self, attempt: int, error: Exception) -> None:
+        logger.error(
+            "AI API error | attempt=%s | provider=%s | model=%s | code=%s | status=%s | response=%s | error=%s",
+            attempt,
+            self.provider,
+            self.model_name,
+            getattr(error, "code", None),
+            getattr(error, "status", None),
+            getattr(error, "response", None),
+            error,
         )
 
-        result = AnalysisResult.model_validate_json(response.text)
-        return self.with_connector_context(result, collected)
+    def _should_retry_ai_error(self, error: Exception) -> bool:
+        error_code = getattr(error, "code", None)
+        error_status = getattr(error, "status", None)
+        return error_code == 503 or (error_code == 429 and error_status == "RESOURCE_EXHAUSTED")
 
     def with_connector_context(self, result: AnalysisResult, collected: dict) -> AnalysisResult:
         result.source_summary = collected["source_summary"]
