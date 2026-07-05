@@ -91,6 +91,7 @@ uv pip install -r requirements.txt   # or: pip install -r requirements.txt
 # export GEMINI_API_KEY="your-gemini-key"
 # export ANTHROPIC_API_KEY="your-anthropic-key"
 # export JWT_SECRET="your-secret"
+# export CORS_ORIGINS="http://localhost:3000"   # comma-separated list; defaults to localhost:3000
 uvicorn main:app --reload --port 8000
 ```
 

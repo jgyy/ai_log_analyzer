@@ -33,6 +33,9 @@ class UserCreate(BaseModel):
     role: UserRole = UserRole.VIEWER
     organization_id: Optional[str] = None
 
+class UserRoleUpdate(BaseModel):
+    role: UserRole
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
