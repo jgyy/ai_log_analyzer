@@ -1,15 +1,15 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Path
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime, timedelta  # ← Added timedelta
+from datetime import datetime, timedelta
 import uuid
 import os
 
 
 from database import get_db, User, Organization, LogAnalysis, AuditLog
 from schemas import (
-    UserCreate, UserLogin, Token, UserResponse,
+    UserCreate, UserLogin, Token, UserResponse, UserRoleUpdate,
     OrganizationCreate, OrganizationResponse,
     LogAnalysisRequest, LogAnalysisResponse, AnalysisResult,
     IncidentAnalysisRequest, IncidentAnalysisResponse, ActionExecutionResponse
@@ -37,9 +37,15 @@ load_dotenv()
 
 app = FastAPI(title="DevOps AI Analyzer - Enterprise")
 
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -78,7 +84,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         email=user.email,
         hashed_password=hash_password(user.password),
         full_name=user.full_name,
-        role="admin" if is_first_user else user.role,  # ← Auto-promote first user
+        role="admin" if is_first_user else user.role,  
         organization_id=user.organization_id
     )
     db.add(db_user)
@@ -149,7 +155,7 @@ def get_me(current_user: UserResponse = Depends(get_current_user)):
 def create_organization(
     org: OrganizationCreate,
     current_user: UserResponse = Depends(require_role(["admin"])),
-    db: Session = Depends(get_db)  # ← Proper FastAPI dependency
+    db: Session = Depends(get_db)  
 ):
     org_id = str(uuid.uuid4())
     
@@ -174,44 +180,6 @@ def create_organization(
         created_at=db_org.created_at,
         is_active=db_org.is_active
     )
-
-# @app.get("/api/org/{org_id}", response_model=OrganizationResponse)
-# def get_organization(
-#     org_id: str = Path(...),
-#     current_user: UserResponse = Depends(get_current_user),
-#     db: Session = Depends(get_db)
-# ):
-#     print(f"3. Entered /api/org/{org_id}")
-#     # 🔐 Org-level access check
-#     if current_user.organization_id != org_id:
-#         raise HTTPException(status_code=403, detail="Access denied to this organization")
-    
-#     org = db.query(Organization).filter(Organization.id == org_id).first()
-#     if not org:
-#         raise HTTPException(status_code=404, detail="Organization not found")
-#     return org
-
-# @app.get("/api/org/{org_id}/users", response_model=List[UserResponse])
-# def list_organization_users(
-#     org_id: str = Path(...),
-#     current_user: UserResponse = Depends(get_current_user),
-#     db: Session = Depends(get_db)
-# ):
-#     print(f"2. Entered /api/org/{org_id}/users")
-#     # 🔐 Admin or same-org check
-#     if current_user.organization_id != org_id and current_user.role != "admin":
-#         raise HTTPException(status_code=403, detail="Access denied")
-        
-#     users = db.query(User).filter(User.organization_id == org_id).all()
-#     orgs = {o.id: o for o in db.query(Organization).all()}
-    
-#     return [
-#         UserResponse(
-#             id=u.id, email=u.email, full_name=u.full_name, role=u.role,
-#             organization_id=u.organization_id,
-#             organization_name=orgs[u.organization_id].name if u.organization_id in orgs else "Unknown"
-#         ) for u in users
-#     ]
 
 # ============ LOG ANALYSIS ENDPOINTS ============
 @app.post("/api/analyze", response_model=LogAnalysisResponse)
@@ -404,10 +372,8 @@ def list_org_users(
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    print(f"1. /org/users - user: {current_user}; db: {db}")
     """List all users in the current user's organization"""
     users = db.query(User).filter(User.organization_id == current_user.organization_id).all()
-    print(f"users: {users}")
     return [
         UserResponse(
             id=u.id,
@@ -447,7 +413,7 @@ def delete_user(
 @app.put("/api/users/{user_id}/role", response_model=UserResponse)
 def update_user_role(
     user_id: str,
-    role_update: dict,
+    role_update: UserRoleUpdate,
     current_user: UserResponse = Depends(require_role(["admin"])),
     db: Session = Depends(get_db)
 ):
@@ -455,15 +421,11 @@ def update_user_role(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     if user.organization_id != current_user.organization_id:
         raise HTTPException(status_code=403, detail="Can only modify users from your organization")
-    
-    new_role = role_update.get("role")
-    if new_role not in ["admin", "sre", "viewer"]:
-        raise HTTPException(status_code=400, detail="Invalid role")
-    
-    user.role = new_role
+
+    user.role = role_update.role.value
     db.commit()
     db.refresh(user)
     
