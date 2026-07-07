@@ -90,7 +90,7 @@ def collect_linux_evidence() -> Dict:
                 ))
 
         if shutil.which("journalctl"):
-            journal = _run(["journalctl", "-p", "warning..alert", "-n", "120", "--no-pager", "-o", "short-iso"], timeout=10)
+            journal = _run(["journalctl", "-p", "warning..emerg", "-n", "120", "--no-pager", "-o", "short-iso"], timeout=10)
             for line in journal.stdout.splitlines()[-80:]:
                 if ERROR_PATTERN.search(line):
                     service_match = SERVICE_PATTERN.search(line)

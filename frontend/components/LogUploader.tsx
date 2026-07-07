@@ -214,11 +214,11 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
             </div>
           )}
 
-          {!manualRequired && (
+          {/* {!manualRequired && (
             <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 text-sm text-slate-400">
               The backend will collect evidence from the local host. Docker analysis requires the backend process to have Docker CLI access.
             </div>
-          )}
+          )} */}
 
           {error && <div className="text-red-400 text-sm bg-red-900/20 border border-red-700 rounded p-3">{error}</div>}
 
