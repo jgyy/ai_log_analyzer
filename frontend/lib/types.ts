@@ -65,8 +65,19 @@ export interface ExecutableAction {
   source: ConnectorType;
 }
 
+export interface MessageResponse {
+  message: string;
+  evidence_ids: string[];
+}
+
 export interface AnalysisResult {
-  investigation_timeline: { start: string; symptom: string; observation: string; finding: string; root_cause: string }
+  investigation_timeline: { 
+    start: MessageResponse; 
+    symptom: MessageResponse; 
+    observation: MessageResponse; 
+    finding: MessageResponse; 
+    root_cause: MessageResponse; 
+  }
   root_cause: { investigation_summary: string; impact: string; root_causes: string[]; hypotheses: string[]; key_findings: string[]; investigation_gaps: string[] }
   mitigation_plan: { summary: string; immediate_mitigation: ImmediateMitigation; rollback_steps: string[]; agent_spec_ready: string[] }
   business_summary: BusinessSummary;
