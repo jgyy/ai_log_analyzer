@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, model_validator
 from typing import List, Literal, Optional
 from datetime import datetime
 from enum import Enum
@@ -71,12 +71,26 @@ class OrganizationResponse(BaseModel):
         from_attributes = True
 
 # Log Analysis Schemas (existing, adding org_id)
+class MessageResponse(BaseModel):
+    message: str
+    evidence_ids: List[str] = []
+
+    @model_validator(mode="before")
+    @classmethod
+    def from_string(cls, value):
+        if (isinstance(value, str)):
+            return ({
+                "message": value,
+                "evidence_ids": []
+            })
+        return value
+
 class InvestigationTimeline(BaseModel):
-    start: str
-    symptom: str
-    observation: str
-    finding: str
-    root_cause: str
+    start: MessageResponse
+    symptom: MessageResponse
+    observation: MessageResponse
+    finding: MessageResponse
+    root_cause: MessageResponse
 
 class RootCauseSection(BaseModel):
     investigation_summary: str

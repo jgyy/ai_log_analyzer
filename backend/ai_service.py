@@ -45,6 +45,20 @@ Populate the "business_summary" object for non-technical stakeholders. Use simpl
 Do not invent financial loss, customer counts, or outage duration unless the evidence explicitly supports it.
 """
 
+BREVITY_INSTRUCTIONS = """
+Keep the response concise and avoid repeating the same fact across sections.
+- investigation_timeline fields: 1 sentence each.
+- root_causes: maximum 3 items.
+- hypotheses: maximum 3 items.
+- key_findings: maximum 4 items.
+- investigation_gaps: maximum 3 items.
+- mitigation steps: maximum 3 steps in each phase.
+- mitigation step descriptions: maximum 140 characters.
+- rollback_steps: maximum 3 items.
+- agent_spec_ready: maximum 3 short items.
+Put secondary details in evidence and investigation_gaps instead of long paragraphs.
+"""
+
 # Mirrors the checks the frontend's sanitizer (frontend/components/MermaidDiagram.tsx)
 # runs defensively before rendering — used here to catch bad diagrams *before*
 # they leave the backend and ask the model to regenerate them instead.
@@ -100,6 +114,7 @@ Do NOT include markdown formatting in text fields. Return ONLY raw JSON.
 
 {DIAGRAM_INSTRUCTIONS}
 {BUSINESS_SUMMARY_INSTRUCTIONS}
+{BREVITY_INSTRUCTIONS}
 Keep executable actions empty unless the backend provides them. Mitigation commands are advisory text only.
 
 Logs:
@@ -162,6 +177,7 @@ Do NOT include markdown formatting in text fields. Return ONLY raw JSON.
 
 {DIAGRAM_INSTRUCTIONS}
 {BUSINESS_SUMMARY_INSTRUCTIONS}
+{BREVITY_INSTRUCTIONS}
 Keep executable actions empty unless the backend provides them. Mitigation commands are advisory text only.
 
 Rules:
