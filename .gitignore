@@ -54,3 +54,4 @@ __pycache__
 sample-logs/*-large.log
 .agents/
 .codex/
+.pytest_cache
