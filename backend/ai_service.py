@@ -4,6 +4,7 @@ from google.genai import types as genai_types
 from schemas import (
     AffectedComponent,
     AnalysisResult,
+    BusinessSummary,
     CollectedEvidence,
     Severity,
     VisualSummary,
@@ -31,6 +32,17 @@ In addition to the written analysis, populate the "diagrams" object with three v
 - mitigation_flowchart: a Mermaid flowchart of the mitigation phases (Prepare -> Pre-Validate -> Apply -> Post-Validate), with key step titles as short labels, including a rollback branch.
 
 Keep node labels short (under 8 words) and always wrap node text in quotes if it contains special characters like parentheses or colons. Never use a Mermaid reserved word (e.g. "end", "class", "click", "style", "subgraph", "direction") as a bare node id.
+"""
+
+BUSINESS_SUMMARY_INSTRUCTIONS = """
+Populate the "business_summary" object for non-technical stakeholders. Use simple, business-facing language and keep each field concise.
+- incident_title: short title for the incident.
+- what_happened: explain the incident without logs, stack traces, Kubernetes terms, container ids, exception names, or commands unless unavoidable.
+- business_impact: describe likely customer or operational impact only when supported by evidence; use "may" when impact is inferred.
+- risk_level: exactly one of Low, Medium, High, Critical.
+- affected_service: name the affected service or "Unknown" if it is not clearly identified.
+- recommended_next_step: one practical next step in plain language.
+Do not invent financial loss, customer counts, or outage duration unless the evidence explicitly supports it.
 """
 
 # Mirrors the checks the frontend's sanitizer (frontend/components/MermaidDiagram.tsx)
@@ -87,6 +99,7 @@ Focus on evidence-based reasoning. If logs are insufficient, clearly state it in
 Do NOT include markdown formatting in text fields. Return ONLY raw JSON.
 
 {DIAGRAM_INSTRUCTIONS}
+{BUSINESS_SUMMARY_INSTRUCTIONS}
 Keep executable actions empty unless the backend provides them. Mitigation commands are advisory text only.
 
 Logs:
@@ -148,6 +161,7 @@ Focus on evidence-based reasoning. If logs are insufficient, clearly state it in
 Do NOT include markdown formatting in text fields. Return ONLY raw JSON.
 
 {DIAGRAM_INSTRUCTIONS}
+{BUSINESS_SUMMARY_INSTRUCTIONS}
 Keep executable actions empty unless the backend provides them. Mitigation commands are advisory text only.
 
 Rules:
@@ -170,6 +184,7 @@ Structured incident evidence:
         current_prompt = prompt
         for attempt in range(MAX_DIAGRAM_ATTEMPTS):
             result = await self._call_model_with_retries(current_prompt)
+            self._ensure_business_summary(result)
             issues = _all_diagram_issues(result)
             if not issues:
                 return result
@@ -180,6 +195,47 @@ Structured incident evidence:
                 )
 
         return result
+
+    def _ensure_business_summary(self, result: AnalysisResult) -> None:
+        summary = result.business_summary or BusinessSummary()
+        default = BusinessSummary()
+
+        if not summary.incident_title or summary.incident_title == default.incident_title:
+            summary.incident_title = self._plain_text(result.visual_summary.headline) or "Infrastructure incident detected"
+        if not summary.what_happened or summary.what_happened == default.what_happened:
+            summary.what_happened = self._plain_text(result.visual_summary.plain_english_summary) or self._plain_text(result.root_cause.investigation_summary) or default.what_happened
+        if not summary.business_impact or summary.business_impact == default.business_impact:
+            summary.business_impact = self._plain_text(result.visual_summary.business_impact) or self._plain_text(result.root_cause.impact) or default.business_impact
+        if not summary.affected_service or summary.affected_service == default.affected_service:
+            summary.affected_service = self._infer_affected_service(result)
+        if not summary.recommended_next_step or summary.recommended_next_step == default.recommended_next_step:
+            summary.recommended_next_step = self._plain_text(result.visual_summary.fix_summary) or self._plain_text(result.mitigation_plan.summary) or default.recommended_next_step
+
+        if summary.risk_level not in ["Low", "Medium", "High", "Critical"]:
+            summary.risk_level = self._business_risk_from_severity(result.severity)
+        elif summary.risk_level == default.risk_level and result.severity in [Severity.CRITICAL, Severity.WARNING, Severity.HEALTHY]:
+            summary.risk_level = self._business_risk_from_severity(result.severity)
+
+        result.business_summary = summary
+
+    def _business_risk_from_severity(self, severity: Severity) -> str:
+        if severity == Severity.CRITICAL:
+            return "Critical"
+        if severity == Severity.WARNING:
+            return "High"
+        if severity == Severity.HEALTHY:
+            return "Low"
+        return "Medium"
+
+    def _infer_affected_service(self, result: AnalysisResult) -> str:
+        if result.affected_components:
+            return result.affected_components[0].name
+        if result.visual_summary.likely_failure_path:
+            return result.visual_summary.likely_failure_path[0]
+        return "Unknown"
+
+    def _plain_text(self, value: str | None) -> str:
+        return re.sub(r"\s+", " ", value or "").strip()
 
     async def _call_model_with_retries(self, prompt: str) -> AnalysisResult:
         for attempt in range(MAX_AI_API_ATTEMPTS):
@@ -241,6 +297,7 @@ Structured incident evidence:
         elif any(item.severity == Severity.WARNING for item in collected["evidence"]):
             result.severity = Severity.WARNING
 
+        self._ensure_business_summary(result)
         return result
 
     def _affected_components_from_evidence(self, evidence: list[CollectedEvidence]) -> list[AffectedComponent]:

@@ -1,6 +1,7 @@
 export type ConnectorType = "manual" | "linux" | "docker";
 export type Severity = "healthy" | "info" | "warning" | "critical";
 export type ActionType = "restart_docker_container" | "start_docker_container" | "stop_docker_container" | "restart_systemd_service";
+export type BusinessRiskLevel = "Low" | "Medium" | "High" | "Critical";
 
 export interface MitigationStep { title: string; description: string; command_or_action: string }
 export interface ImmediateMitigation { prepare: MitigationStep[], pre_validate: MitigationStep[], apply: MitigationStep[], post_validate: MitigationStep[] }
@@ -45,6 +46,15 @@ export interface VisualSummary {
   fix_summary: string;
 }
 
+export interface BusinessSummary {
+  incident_title: string;
+  what_happened: string;
+  business_impact: string;
+  risk_level: BusinessRiskLevel;
+  affected_service: string;
+  recommended_next_step: string;
+}
+
 export interface ExecutableAction {
   id: string;
   label: string;
@@ -59,6 +69,7 @@ export interface AnalysisResult {
   investigation_timeline: { start: string; symptom: string; observation: string; finding: string; root_cause: string }
   root_cause: { investigation_summary: string; impact: string; root_causes: string[]; hypotheses: string[]; key_findings: string[]; investigation_gaps: string[] }
   mitigation_plan: { summary: string; immediate_mitigation: ImmediateMitigation; rollback_steps: string[]; agent_spec_ready: string[] }
+  business_summary: BusinessSummary;
   diagrams?: AnalysisDiagrams
   source_summary: SourceSummary[];
   affected_components: AffectedComponent[];

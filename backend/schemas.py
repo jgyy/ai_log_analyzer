@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional
+from typing import List, Literal, Optional
 from datetime import datetime
 from enum import Enum
 
@@ -142,6 +142,14 @@ class VisualSummary(BaseModel):
     business_impact: str = ""
     fix_summary: str = ""
 
+class BusinessSummary(BaseModel):
+    incident_title: str = "Incident summary unavailable"
+    what_happened: str = "The available evidence was not enough to clearly explain what happened."
+    business_impact: str = "Business impact was not clearly identified from the available logs."
+    risk_level: Literal["Low", "Medium", "High", "Critical"] = "Medium"
+    affected_service: str = "Unknown"
+    recommended_next_step: str = "Review the technical analysis and confirm the affected service with the response team."
+
 class ExecutableAction(BaseModel):
     id: str
     label: str
@@ -161,6 +169,7 @@ class AnalysisResult(BaseModel):
     investigation_timeline: InvestigationTimeline
     root_cause: RootCauseSection
     mitigation_plan: MitigationPlan
+    business_summary: BusinessSummary = Field(default_factory=BusinessSummary)
     diagrams: Optional[AnalysisDiagrams] = None
     source_summary: List[SourceSummary] = Field(default_factory=list)
     affected_components: List[AffectedComponent] = Field(default_factory=list)
