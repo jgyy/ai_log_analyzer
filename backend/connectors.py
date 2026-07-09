@@ -289,7 +289,11 @@ def collect_manual_evidence(logs: str | None) -> Dict:
     }
 
 
-def collect_sources(sources: List[ConnectorType], logs: str | None = None) -> Dict:
+def collect_sources(sources: List[ConnectorType],
+            logs: str | None = None,
+            vm_targets: List[str] | None = None, 
+            db=None, 
+            organization_id: str | None = None,) -> Dict:
     summaries: List[SourceSummary] = []
     evidence: List[CollectedEvidence] = []
     actions: List[ExecutableAction] = []
@@ -301,6 +305,12 @@ def collect_sources(sources: List[ConnectorType], logs: str | None = None) -> Di
             result = collect_linux_evidence()
         elif source == ConnectorType.DOCKER:
             result = collect_docker_evidence()
+        elif source == ConnectorType.VM:
+            from connectors_vm import collect_vm_evidence
+            if db is None or organization_id is None:
+                result = _failure_summary(ConnectorType.VM, "VM evidence collection requires an authenticated request context.")
+            else:
+                result = collect_vm_evidence(vm_targets, organization_id, db)
         else:
             continue
 

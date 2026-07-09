@@ -12,6 +12,7 @@ class ConnectorType(str, Enum):
     MANUAL = "manual"
     LINUX = "linux"
     DOCKER = "docker"
+    VM = "virtualbox"
 
 class Severity(str, Enum):
     HEALTHY = "healthy"
@@ -24,6 +25,11 @@ class ActionType(str, Enum):
     START_DOCKER_CONTAINER = "start_docker_container"
     STOP_DOCKER_CONTAINER = "stop_docker_container"
     RESTART_SYSTEMD_SERVICE = "restart_systemd_service"
+    START_VM = "start_vm"
+    STOP_VM = "stop_vm"
+    RESTART_VM = "restart_vm"
+    RESTORE_VM_SNAPSHOT = "restore_vm_snapshot"
+    RESTART_GDM_SERVICE = "restart_gdm_service"
 
 # Auth Schemas
 class UserCreate(BaseModel):
@@ -204,6 +210,12 @@ class IncidentAnalysisRequest(BaseModel):
     sources: List[ConnectorType] = Field(default_factory=lambda: [ConnectorType.MANUAL])
     logs: Optional[str] = None
     domain: str = "infrastructure"
+    vm_targets: Optional[List[str]] = None  # VM names to inspect, only used when ConnectorType.VM is in sources
+
+class ActionExecutionRequest(BaseModel):
+    confirm: bool = False
+    # Required for actions the backend flags as destructive/irreversible
+    # (e.g. restore_vm_snapshot). Ignored for all other action types.
 
 class LogAnalysisResponse(BaseModel):
     id: str
@@ -219,3 +231,23 @@ class LogAnalysisResponse(BaseModel):
 
 class IncidentAnalysisResponse(LogAnalysisResponse):
     pass
+
+#---start VM (VirtualBox) schemas---
+class VMInfo(BaseModel):
+    name: str
+    uuid: str
+    state: str
+    guest_additions_running: bool = False
+    has_credentials: bool = False
+    snapshot_count: int = 0
+ 
+class VMCredentialCreate(BaseModel):
+    username: str
+    password: str
+ 
+ 
+class VMCredentialStatus(BaseModel):
+    vm_name: str
+    configured: bool
+    created_at: Optional[datetime] = None
+#---end VM (VirtualBox) schemas---

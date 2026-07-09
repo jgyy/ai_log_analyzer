@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, DateTime, ForeignKey, Boolean, Text, Integer
+from sqlalchemy import create_engine, Column, String, DateTime, ForeignKey, Boolean, Text, Integer, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -66,6 +66,30 @@ class AuditLog(Base):
     details = Column(Text)
     ip_address = Column(String(45))
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+class VMCredential(Base):
+    """
+    Diagnostic-only guest OS credentials for a VirtualBox VM, used to run
+    read-only checks via `VBoxManage guestcontrol` when a VM's network/
+    display stack is too broken to reach any other way.
+ 
+    Username/password are stored encrypted (see crypto_utils.py) — never
+    stored or returned in plaintext. Scoped per-organization: one set of
+    credentials per (organization_id, vm_name).
+    """
+    __tablename__ = "vm_credentials"
+ 
+    id = Column(String(36), primary_key=True)
+    organization_id = Column(String(36), ForeignKey("organizations.id"), nullable=False)
+    vm_name = Column(String(255), nullable=False, index=True)
+    encrypted_username = Column(Text, nullable=False)
+    encrypted_password = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by_user_id = Column(String(36), ForeignKey("users.id"))
+ 
+    __table_args__ = (
+        UniqueConstraint("organization_id", "vm_name", name="uq_vm_credential_org_vm"),
+    )
 
 Base.metadata.create_all(bind=engine)
 

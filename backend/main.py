@@ -7,16 +7,19 @@ import uuid
 import os
 
 
-from database import get_db, User, Organization, LogAnalysis, AuditLog
+from database import get_db, User, Organization, LogAnalysis, AuditLog, VMCredential
 from schemas import (
     UserCreate, UserLogin, Token, UserResponse, UserRoleUpdate,
     OrganizationCreate, OrganizationResponse,
     LogAnalysisRequest, LogAnalysisResponse, AnalysisResult,
-    IncidentAnalysisRequest, IncidentAnalysisResponse, ActionExecutionResponse
+    IncidentAnalysisRequest, IncidentAnalysisResponse, ActionExecutionResponse,
+    ActionExecutionRequest, VMInfo, VMCredentialCreate, VMCredentialStatus, ActionType
 )
 from ai_service import AIService
 from log_processor import preprocess_logs
 from connectors import collect_sources
+from connectors_vm import list_vms as vboxmanage_list_vms, get_vm_info
+from crypto_utils import encrypt_value, CredentialEncryptionError
 from actions import execute_allowlisted_action, find_action
 from auth import (
     hash_password, verify_password, create_access_token,
@@ -270,7 +273,10 @@ async def analyze_incident(
     db.commit()
 
     try:
-        collected = collect_sources(request.sources, request.logs)
+        collected = collect_sources(request.sources, request.logs,
+                    vm_targets=request.vm_targets,
+                    db=db,
+                    organization_id=current_user.organization_id)
         result = await ai.analyze_incident(collected, request.domain)
 
         db_analysis.status = "completed"
@@ -306,6 +312,7 @@ async def analyze_incident(
 @app.post("/api/actions/{action_id}/execute", response_model=ActionExecutionResponse)
 def execute_action(
     action_id: str,
+    request: ActionExecutionRequest = ActionExecutionRequest(),
     current_user: UserResponse = Depends(require_role(["admin", "sre"])),
     db: Session = Depends(get_db)
 ):
@@ -328,6 +335,16 @@ def execute_action(
 
     if not matched_action:
         raise HTTPException(status_code=404, detail="Allowlisted action not found for this organization")
+    # Destructive/VM lifecycle actions get an extra, fresh existence check
+    # right before execution — a matched action could reference a VM that
+    # was since renamed or deleted since the analysis that produced it.
+    vm_action_types = {
+        ActionType.START_VM, ActionType.STOP_VM,
+        ActionType.RESTART_VM, ActionType.RESTORE_VM_SNAPSHOT,
+    }
+    if matched_action.action_type in vm_action_types:
+        if get_vm_info(matched_action.target) is None:
+            raise HTTPException(status_code=404, detail=f"VM '{matched_action.target}' no longer exists on this host")
 
     execution = execute_allowlisted_action(matched_action)
     audit = AuditLog(
@@ -499,6 +516,117 @@ def create_user(
         organization_id=new_user.organization_id,
         organization_name=current_user.organization_name
     )
+
+
+@app.get("/api/vms", response_model=List[VMInfo])
+def list_vms(
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List VirtualBox VMs registered on this host, with credential status per org."""
+    vms = []
+    for entry in vboxmanage_list_vms():
+        info = get_vm_info(entry["name"]) or {}
+        has_cred = db.query(VMCredential).filter(
+            VMCredential.organization_id == current_user.organization_id,
+            VMCredential.vm_name == entry["name"],
+        ).first() is not None
+        vms.append(VMInfo(
+            name=entry["name"],
+            uuid=entry.get("uuid", info.get("uuid", "")),
+            state=info.get("state", entry.get("state", "unknown")),
+            guest_additions_running=info.get("guest_additions_running", False),
+            has_credentials=has_cred,
+            snapshot_count=info.get("snapshot_count", 0),
+        ))
+    return vms
+ 
+@app.post("/api/vms/{vm_name}/credentials", response_model=VMCredentialStatus)
+def set_vm_credentials(
+    vm_name: str,
+    credentials: VMCredentialCreate,
+    current_user: UserResponse = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Register (or replace) diagnostic-only guest OS credentials for a VM.
+    Credentials are encrypted at rest and never returned in plaintext by
+    any endpoint. Use a low-privilege account scoped to read-only
+    diagnostics — not a full admin/root guest account.
+    """
+    try:
+        encrypted_username = encrypt_value(credentials.username)
+        encrypted_password = encrypt_value(credentials.password)
+    except CredentialEncryptionError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+ 
+    existing = db.query(VMCredential).filter(
+        VMCredential.organization_id == current_user.organization_id,
+        VMCredential.vm_name == vm_name,
+    ).first()
+ 
+    if existing:
+        existing.encrypted_username = encrypted_username
+        existing.encrypted_password = encrypted_password
+        existing.created_by_user_id = current_user.id
+        existing.created_at = datetime.utcnow()
+        record = existing
+    else:
+        record = VMCredential(
+            id=str(uuid.uuid4()),
+            organization_id=current_user.organization_id,
+            vm_name=vm_name,
+            encrypted_username=encrypted_username,
+            encrypted_password=encrypted_password,
+            created_by_user_id=current_user.id,
+        )
+        db.add(record)
+ 
+    db.commit()
+    db.refresh(record)
+ 
+    audit = AuditLog(
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
+        action="VM_CREDENTIALS_SET",
+        resource_type="vm_credential",
+        resource_id=record.id,
+        details=f"VM: {vm_name}",
+    )
+    db.add(audit)
+    db.commit()
+ 
+    return VMCredentialStatus(vm_name=vm_name, configured=True, created_at=record.created_at)
+ 
+@app.delete("/api/vms/{vm_name}/credentials")
+def delete_vm_credentials(
+    vm_name: str,
+    current_user: UserResponse = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db)
+):
+    """Remove diagnostic credentials for a VM (admin only)."""
+    existing = db.query(VMCredential).filter(
+        VMCredential.organization_id == current_user.organization_id,
+        VMCredential.vm_name == vm_name,
+    ).first()
+    if not existing:
+        raise HTTPException(status_code=404, detail="No credentials configured for this VM")
+ 
+    db.delete(existing)
+    db.commit()
+ 
+    audit = AuditLog(
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
+        action="VM_CREDENTIALS_DELETED",
+        resource_type="vm_credential",
+        resource_id=None,
+        details=f"VM: {vm_name}",
+    )
+    db.add(audit)
+    db.commit()
+ 
+    return {"message": "Credentials removed"}
 
 # ============ HEALTH CHECK ============
 @app.get("/health")

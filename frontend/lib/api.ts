@@ -1,4 +1,4 @@
-import { AnalysisResult, ConnectorType } from "@/lib/types";
+import { AnalysisResult, ConnectorType, VMInfo } from "@/lib/types";
 let token: string | null = null;
 
 export function setToken(t: string | null) {
@@ -99,21 +99,38 @@ export async function analyzeLogs(logs: string, domain: string = 'kubernetes') {
   });
 }
 
-export async function analyzeIncident(payload: { sources: ConnectorType[], logs?: string, domain?: string }) {
+export async function analyzeIncident(payload: { sources: ConnectorType[], logs?: string, domain?: string, vm_targets?: string[] }) {
   return apiRequest('/api/incidents/analyze', {
     method: 'POST',
     body: JSON.stringify({
       sources: payload.sources,
       logs: payload.logs,
       domain: payload.domain || 'infrastructure',
+      vm_targets: payload.vm_targets
     }),
   });
 }
 
-export async function executeAction(actionId: string) {
+export async function executeAction(actionId: string, confirm: boolean = false) {
   return apiRequest(`/api/actions/${encodeURIComponent(actionId)}/execute`, {
     method: 'POST',
+    body: JSON.stringify({ confirm })
   });
+}
+
+export async function listVMs(): Promise<VMInfo[]> {
+  return apiRequest('/api/vms');
+}
+ 
+export async function setVMCredentials(vmName: string, username: string, password: string) {
+  return apiRequest(`/api/vms/${encodeURIComponent(vmName)}/credentials`, {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+}
+ 
+export async function deleteVMCredentials(vmName: string) {
+  return apiRequest(`/api/vms/${encodeURIComponent(vmName)}/credentials`, { method: 'DELETE' });
 }
 
 export async function getAnalyses() {
