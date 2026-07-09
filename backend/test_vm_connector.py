@@ -138,5 +138,28 @@ class VMConnectorTests(unittest.TestCase):
         self.assertEqual(display_evidence[0].severity.value, "critical")
 
 
+    @patch("connectors_vm._get_credential")
+    @patch("connectors_vm.get_vm_info")
+    @patch("connectors_vm.shutil.which")
+    def test_guest_command_timeout_degrades_to_warning_not_crash(self, which, get_vm_info, get_credential):
+        which.return_value = "/usr/bin/VBoxManage"
+        get_vm_info.return_value = {
+            "name": "test-vm", "uuid": "abc", "state": "running",
+            "guest_additions_running": True, "guest_os": "Debian",
+            "memory_mb": "2048", "snapshot_count": 0,
+        }
+        get_credential.return_value = ("diag-user", "diag-pass")
+
+        import connectors_vm
+        with patch("connectors_vm._run", side_effect=subprocess.TimeoutExpired(cmd="VBoxManage", timeout=15)):
+            # Should not raise — a slow/unreachable guest degrades to
+            # warning evidence for that VM, not a crashed analysis.
+            result = connectors_vm.collect_vm_evidence(["test-vm"], "org-1", db=MagicMock())
+
+        self.assertTrue(result["summary"].collected)
+        messages = [e.message for e in result["evidence"]]
+        self.assertTrue(any("timed out" in m or "Could not run diagnostic" in m for m in messages))
+
+
 if __name__ == "__main__":
     unittest.main()

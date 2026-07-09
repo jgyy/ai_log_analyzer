@@ -24,6 +24,7 @@ from database import VMCredential
 from schemas import ActionType, ConnectorType, ExecutableAction, Severity, SourceSummary
 
 GUEST_COMMAND_TIMEOUT = 15
+GUEST_DPKG_VERIFY_TIMEOUT = 60  # dpkg -V hashes every installed file — much slower than the other checks
 # Best-effort parse of VBoxManage's --machinereadable `key="value"` output.
 _KV_PATTERN = re.compile(r'^([A-Za-z0-9_]+)="?(.*?)"?$')
 
@@ -111,18 +112,42 @@ def _guest_run(vm_name: str, username: str, password: str, shell_command: str, t
     Runs `shell_command` inside the guest via VBoxManage guestcontrol,
     using the hypervisor's guest channel (works even if the guest's network
     and display stack are both down, as long as Guest Additions are running).
+
+    Uses /bin/sh rather than /bin/bash: every diagnostic command this
+    connector runs is plain POSIX shell, and not every guest image ships
+    bash. `--exe` already supplies argv0 for the invoked program, so the
+    args after `--` should NOT repeat the shell name — doing so shifts
+    every argument by one position and breaks execution (e.g. `sh -c` was
+    read as "open a script named sh").
+
+    Never raises: a slow/unreachable guest should degrade to a failed
+    check for that one command, not crash the whole incident analysis.
+    Guestcontrol commands are noticeably slower than local subprocess
+    calls (they go through the hypervisor channel and the guest's own
+    process spawn), so callers running heavier commands (e.g. `dpkg -V`,
+    which hashes every installed file) should pass a longer timeout.
     """
-    return _run(
-        [
-            "VBoxManage", "guestcontrol", vm_name, "run",
-            "--username", username,
-            "--password", password,
-            "--exe", "/bin/bash",
-            "--",
-            "bash", "-c", shell_command,
-        ],
-        timeout=timeout,
-    )
+    try:
+        return _run(
+            [
+                "VBoxManage", "guestcontrol", vm_name, "run",
+                "--username", username,
+                "--password", password,
+                "--exe", "/bin/sh",
+                "--",
+                "-c", shell_command,
+            ],
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(
+            args=[], returncode=-1, stdout="",
+            stderr=f"guestcontrol command timed out after {timeout}s",
+        )
+    except Exception as exc:
+        return subprocess.CompletedProcess(
+            args=[], returncode=-1, stdout="", stderr=f"guestcontrol command failed: {exc}",
+        )
 
 
 def _collect_guest_diagnostics(vm_name: str, username: str, password: str) -> List:
@@ -171,8 +196,19 @@ def _collect_guest_diagnostics(vm_name: str, username: str, password: str) -> Li
     # having reassigned system files to a regular user (dpkg -V flags mode/
     # owner mismatches against the package database, unlike debsums which
     # only checks file content).
-    dpkg_verify = _guest_run(vm_name, username, password, "dpkg -V 2>/dev/null | head -n 50")
-    if dpkg_verify.stdout.strip():
+    dpkg_verify = _guest_run(
+        vm_name, username, password, "dpkg -V 2>/dev/null | head -n 50",
+        timeout=GUEST_DPKG_VERIFY_TIMEOUT,
+    )
+    if dpkg_verify.returncode == -1:
+        evidence.append(_evidence(
+            ConnectorType.VM,
+            f"vm:{vm_name}:package-integrity",
+            f"Package integrity check did not complete: {dpkg_verify.stderr}",
+            Severity.WARNING,
+            {"vm": vm_name},
+        ))
+    elif dpkg_verify.stdout.strip():
         mismatch_lines = [l for l in dpkg_verify.stdout.splitlines() if l.strip()]
         if mismatch_lines:
             evidence.append(_evidence(
