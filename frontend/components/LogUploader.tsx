@@ -287,7 +287,7 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
                 </div>
               )}
               <p className="text-xs text-slate-500">
-                Guest-level checks (display stack, package integrity, disk) only run for VMs with diagnostic credentials configured under Settings → VMs.
+                Guest diagnostics only run for VMs with diagnostic credentials configured (under the "VMs" page)
               </p>
             </div>
           )}

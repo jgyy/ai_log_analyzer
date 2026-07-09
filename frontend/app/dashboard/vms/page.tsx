@@ -107,8 +107,11 @@ export default function VMManagement() {
           </h1>
           <p className="text-slate-400 mt-1">
             VMs registered on the backend host. Diagnostic credentials are used only for
-            read-only guest checks (failed services, display stack, disk, package integrity)
-            — use a dedicated low-privilege guest account, not a full admin/root login.
+            read-only guest checks (failed systemd units, journal errors, disk, memory, load)
+            — use a dedicated low-privilege guest account, not a full admin/root login. That
+            account must belong to the <code className="text-slate-300">systemd-journal</code> group
+            (or otherwise have read access to the systemd journal), or the journal-based checks
+            will silently return no results.
           </p>
         </div>
 
@@ -208,8 +211,11 @@ export default function VMManagement() {
 
               <div className="mb-4 p-3 rounded border border-amber-700/50 bg-amber-950/20 text-xs text-amber-200/90">
                 Use a dedicated, low-privilege guest account for this. It only needs
-                permission to run read-only commands (systemctl status, journalctl, df, dpkg -V) —
-                not an admin or root login.
+                permission to run read-only commands (systemctl status, journalctl, df, free, uptime) —
+                not an admin or root login. It must also be a member of the{" "}
+                <code className="text-amber-100">systemd-journal</code> group so
+                journalctl-based checks can actually read the journal; without that
+                membership those checks will run successfully but return no log data.
               </div>
 
               <div className="space-y-4">

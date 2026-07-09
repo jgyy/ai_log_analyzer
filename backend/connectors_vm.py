@@ -1,15 +1,3 @@
-"""
-VirtualBox connector: host-level VM lifecycle facts via VBoxManage, plus
-optional guest-level diagnostics (reusing the same failure signatures the
-Linux connector looks for) via `VBoxManage guestcontrol`, which reaches a
-VM's guest OS through the hypervisor channel rather than the network — the
-only path that still works when a VM's display stack or networking is
-broken (black screen, no SSH, no console TTY).
-
-Guest-level checks require diagnostic credentials to be registered for the
-VM first (see crypto_utils.py / database.VMCredential). Host-level facts
-(power state, snapshots, Guest Additions status) never require credentials.
-"""
 import re
 import shutil
 import subprocess
@@ -18,13 +6,12 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from connectors import _evidence, _failure_summary, _run
+from connectors import _collect_system_evidence, _evidence, _failure_summary, _run
 from crypto_utils import CredentialEncryptionError, decrypt_value
 from database import VMCredential
 from schemas import ActionType, ConnectorType, ExecutableAction, Severity, SourceSummary
 
 GUEST_COMMAND_TIMEOUT = 15
-GUEST_DPKG_VERIFY_TIMEOUT = 60  # dpkg -V hashes every installed file — much slower than the other checks
 # Best-effort parse of VBoxManage's --machinereadable `key="value"` output.
 _KV_PATTERN = re.compile(r'^([A-Za-z0-9_]+)="?(.*?)"?$')
 
@@ -124,8 +111,8 @@ def _guest_run(vm_name: str, username: str, password: str, shell_command: str, t
     check for that one command, not crash the whole incident analysis.
     Guestcontrol commands are noticeably slower than local subprocess
     calls (they go through the hypervisor channel and the guest's own
-    process spawn), so callers running heavier commands (e.g. `dpkg -V`,
-    which hashes every installed file) should pass a longer timeout.
+    process spawn), so callers running unusually heavy commands should
+    pass a longer timeout than GUEST_COMMAND_TIMEOUT.
     """
     try:
         return _run(
@@ -152,33 +139,38 @@ def _guest_run(vm_name: str, username: str, password: str, shell_command: str, t
 
 def _collect_guest_diagnostics(vm_name: str, username: str, password: str) -> List:
     """
-    Re-runs the same failure signatures the Linux connector looks for
-    (failed units, disk pressure) plus the VM-specific display-stack /
-    ownership-drift checks this connector adds, against a VM's guest OS.
-    """
-    evidence = []
+    Runs the exact same failure-signature checks as
+    connectors.collect_linux_evidence() (failed systemd units, warning+
+    journal entries, disk pressure, memory, load) against the VM's guest OS,
+    via the shared `_collect_system_evidence` helper — rather than this
+    connector reimplementing its own narrower, VM-specific versions of the
+    same checks. On top of that shared set, this connector adds one
+    genuinely VM-specific check: a display-stack crash signature.
 
-    failed_units = _guest_run(vm_name, username, password, "systemctl --failed --no-legend --plain")
-    if failed_units.returncode == 0 and failed_units.stdout.strip():
-        for line in failed_units.stdout.splitlines()[:20]:
-            parts = line.split()
-            service_name = next((p for p in parts if p.endswith(".service")), parts[0] if parts else "systemd")
-            evidence.append(_evidence(
-                ConnectorType.VM,
-                f"vm:{vm_name}:{service_name}",
-                f"Failed systemd unit in guest: {line}",
-                Severity.CRITICAL,
-                {"vm": vm_name, "raw": line},
-            ))
+    Note: a previous `dpkg -V` package-integrity check has been removed.
+    It hashes every installed file against the package database, which is
+    far slower than the other checks even locally, and over the
+    `VBoxManage guestcontrol` channel it reliably timed out — especially
+    on busier or larger guests — degrading every analysis run instead of
+    adding a rarely-useful signal.
+    """
+    def guest_run(command: List[str], timeout: int = GUEST_COMMAND_TIMEOUT) -> subprocess.CompletedProcess:
+        return _guest_run(vm_name, username, password, " ".join(command), timeout=timeout)
+
+    collected = _collect_system_evidence(ConnectorType.VM, guest_run, component_prefix=f"vm:{vm_name}:")
+    evidence = collected["evidence"]
+    any_succeeded = collected["any_command_succeeded"]
 
     # Display-stack crash signature (gdm-x-session Fatal server error, X
     # display retry exhaustion) — the exact pattern behind the black-screen
     # / non-blinking-cursor failure this connector was built to catch.
+    # This is genuinely VM-specific, so it isn't part of the shared checks.
     gdm_journal = _guest_run(
         vm_name, username, password,
         "journalctl -u gdm3 -b --no-pager 2>/dev/null | tail -n 200",
     )
-    if gdm_journal.returncode == 0 and gdm_journal.stdout.strip():
+    if gdm_journal.returncode == 0:
+        any_succeeded = True
         text = gdm_journal.stdout
         if "Fatal server error" in text or "maximum number of X display failures reached" in text:
             evidence.append(_evidence(
@@ -192,56 +184,7 @@ def _collect_guest_diagnostics(vm_name: str, username: str, password: str) -> Li
                 {"vm": vm_name},
             ))
 
-    # Ownership/permission drift — catches things like a broad `chown -R`
-    # having reassigned system files to a regular user (dpkg -V flags mode/
-    # owner mismatches against the package database, unlike debsums which
-    # only checks file content).
-    dpkg_verify = _guest_run(
-        vm_name, username, password, "dpkg -V 2>/dev/null | head -n 50",
-        timeout=GUEST_DPKG_VERIFY_TIMEOUT,
-    )
-    if dpkg_verify.returncode == -1:
-        evidence.append(_evidence(
-            ConnectorType.VM,
-            f"vm:{vm_name}:package-integrity",
-            f"Package integrity check did not complete: {dpkg_verify.stderr}",
-            Severity.WARNING,
-            {"vm": vm_name},
-        ))
-    elif dpkg_verify.stdout.strip():
-        mismatch_lines = [l for l in dpkg_verify.stdout.splitlines() if l.strip()]
-        if mismatch_lines:
-            evidence.append(_evidence(
-                ConnectorType.VM,
-                f"vm:{vm_name}:package-integrity",
-                f"{len(mismatch_lines)} file(s) differ from their package-installed "
-                f"state (ownership/permissions/content) — possible sign of a broad "
-                f"chown/chmod having touched system files:\n" + "\n".join(mismatch_lines[:20]),
-                Severity.WARNING,
-                {"vm": vm_name},
-            ))
-
-    # Disk pressure — the "No space left on device" cascade seen when a
-    # runaway log fills the guest's root filesystem.
-    disk = _guest_run(vm_name, username, password, "df -h / 2>/dev/null")
-    if disk.returncode == 0 and disk.stdout.strip():
-        lines = disk.stdout.splitlines()
-        if len(lines) > 1:
-            usage_parts = lines[1].split()
-            used_pct = usage_parts[4] if len(usage_parts) > 4 else "unknown"
-            try:
-                high_usage = used_pct.endswith("%") and int(used_pct[:-1]) >= 90
-            except ValueError:
-                high_usage = False
-            evidence.append(_evidence(
-                ConnectorType.VM,
-                f"vm:{vm_name}:disk-cascade",
-                f"Guest root filesystem usage is {used_pct}.",
-                Severity.CRITICAL if high_usage else Severity.INFO,
-                {"vm": vm_name, "raw": lines[1]},
-            ))
-
-    if failed_units.returncode != 0 and gdm_journal.returncode != 0 and dpkg_verify.returncode != 0:
+    if not any_succeeded:
         evidence.append(_evidence(
             ConnectorType.VM,
             f"vm:{vm_name}:guest-access",
@@ -342,7 +285,7 @@ def collect_vm_evidence(vm_names: Optional[List[str]], organization_id: str, db:
                 ConnectorType.VM,
                 f"vm:{vm_name}:guest-access",
                 f"No diagnostic credentials configured for '{vm_name}' — "
-                f"guest-level checks (display stack, package integrity, disk) "
+                f"guest-level checks (display stack, disk, logs) "
                 f"were skipped. Host-level facts only.",
                 Severity.WARNING,
                 {"vm": vm_name},
