@@ -4,10 +4,12 @@ import shutil
 import subprocess
 import uuid
 from datetime import datetime
-from typing import Dict, List
+from typing import Callable, Dict, List
 
 from schemas import ActionType, CollectedEvidence, ConnectorType, EvidenceMetadata, ExecutableAction, Severity, SourceSummary
+import logging
 
+logger  = logging.getLogger(__name__)
 
 ERROR_PATTERN = re.compile(r"\b(error|failed|fatal|critical|panic|oom|denied|unhealthy)\b", re.IGNORECASE)
 SERVICE_PATTERN = re.compile(r"([a-zA-Z0-9_.@-]+\.service)")
@@ -59,50 +61,55 @@ def _failure_summary(source: ConnectorType, message: str) -> Dict:
     }
 
 
-def collect_linux_evidence() -> Dict:
+def _collect_system_evidence(
+    source: ConnectorType,
+    run: Callable[[List[str]], subprocess.CompletedProcess],
+    component_prefix: str = "",
+) -> Dict:
     evidence: List[CollectedEvidence] = []
-    actions: List[ExecutableAction] = []
+    failed_services: List[str] = []
+    any_command_succeeded = False
 
-    if not shutil.which("systemctl"):
-        return _failure_summary(ConnectorType.LINUX, "systemctl is not available on this host.")
+    def safe_run(command: List[str]) -> subprocess.CompletedProcess:
+        try:
+            logger.info("safe_run in _collect_system_evidence")
+            return run(command)
+        except Exception as exc:
+            logger.error(f"exception in safe_run: {exc}")
+            return subprocess.CompletedProcess(args=command, returncode=-1, stdout="", stderr=str(exc))
 
-    try:
-        failed = _run(["systemctl", "--failed", "--no-legend", "--plain"], timeout=8)
-        if failed.stdout.strip():
-            for line in failed.stdout.splitlines()[:20]:
-                parts = line.split()
-                service_name = next((part for part in parts if part.endswith(".service")), parts[0] if parts else "systemd")
-                evidence.append(_evidence(
-                    ConnectorType.LINUX,
-                    service_name,
-                    f"Failed systemd unit detected: {line}",
-                    Severity.CRITICAL,
-                    {"raw": line},
-                ))
-                actions.append(ExecutableAction(
-                    id=f"systemd-restart:{service_name}",
-                    label=f"Restart {service_name}",
-                    action_type=ActionType.RESTART_SYSTEMD_SERVICE,
-                    target=service_name,
-                    risk_level="high",
-                    preconditions=["Service appeared in local systemd failed-unit evidence."],
-                    source=ConnectorType.LINUX,
-                ))
+    failed = safe_run(["systemctl", "--failed", "--no-legend", "--plain"])
+    logger.info(f"systemctl --failed...: {failed}")
+    if failed.returncode == 0:
+        any_command_succeeded = True
+        for line in failed.stdout.splitlines()[:20]:
+            if not line.strip():
+                continue
+            parts = line.split()
+            service_name = next((part for part in parts if part.endswith(".service")), parts[0] if parts else "systemd")
+            failed_services.append(service_name)
+            evidence.append(_evidence(
+                source,
+                f"{component_prefix}{service_name}",
+                f"Failed systemd unit detected: {line}",
+                Severity.CRITICAL,
+                {"raw": line},
+            ))
 
-        if shutil.which("journalctl"):
-            journal = _run(["journalctl", "-p", "warning..emerg", "-n", "120", "--no-pager", "-o", "short-iso"], timeout=10)
-            for line in journal.stdout.splitlines()[-80:]:
-                if ERROR_PATTERN.search(line):
-                    service_match = SERVICE_PATTERN.search(line)
-                    component = service_match.group(1) if service_match else "linux"
-                    evidence.append(_evidence(
-                        ConnectorType.LINUX,
-                        component,
-                        line,
-                        Severity.WARNING,
-                    ))
+    journal = safe_run(["journalctl", "-p", "warning..emerg", "-n", "120", "--no-pager", "-o", "short-iso"])
+    logger.info(f"journalctl -p...: {journal}")
+    if journal.returncode == 0:
+        any_command_succeeded = True
+        for line in journal.stdout.splitlines()[-80:]:
+            if ERROR_PATTERN.search(line):
+                service_match = SERVICE_PATTERN.search(line)
+                component = service_match.group(1) if service_match else "linux"
+                evidence.append(_evidence(source, f"{component_prefix}{component}", line, Severity.WARNING))
 
-        disk = _run(["df", "-h", "/"], timeout=5)
+    disk = safe_run(["df", "-h", "/"])
+    logger.info(f"df -h...: {disk}")
+    if disk.returncode == 0:
+        any_command_succeeded = True
         if disk.stdout.strip():
             lines = disk.stdout.splitlines()
             if len(lines) > 1:
@@ -114,33 +121,64 @@ def collect_linux_evidence() -> Dict:
                     high_usage = False
                 severity = Severity.WARNING if high_usage else Severity.INFO
                 evidence.append(_evidence(
-                    ConnectorType.LINUX,
-                    "disk:/",
+                    source,
+                    f"{component_prefix}disk:/",
                     f"Root filesystem usage is {used_pct}.",
                     severity,
                     {"raw": lines[1]},
                 ))
 
-        memory = _run(["free", "-m"], timeout=5)
+    memory = safe_run(["free", "-m"])
+    logger.info(f"free -m: {memory}")
+    if memory.returncode == 0:
+        any_command_succeeded = True
         if memory.stdout.strip():
             evidence.append(_evidence(
-                ConnectorType.LINUX,
-                "memory",
+                source,
+                f"{component_prefix}memory",
                 "Memory snapshot collected.",
                 Severity.INFO,
                 {"raw": memory.stdout.strip()[:1000]},
             ))
 
-        uptime = _run(["uptime"], timeout=5)
+    uptime = safe_run(["uptime"])
+    if uptime.returncode == 0:
+        any_command_succeeded = True
         if uptime.stdout.strip():
-            evidence.append(_evidence(
-                ConnectorType.LINUX,
-                "load",
-                uptime.stdout.strip(),
-                Severity.INFO,
-            ))
+            evidence.append(_evidence(source, f"{component_prefix}load", uptime.stdout.strip(), Severity.INFO))
+
+    logger.info(f"evidence: {evidence}")
+    logger.info(f"failed_service: {failed_services}")
+    logger.info(f"any_cmd_succeeded: {any_command_succeeded}")
+    return {
+        "evidence": evidence,
+        "failed_services": failed_services,
+        "any_command_succeeded": any_command_succeeded,
+    }
+
+
+def collect_linux_evidence() -> Dict:
+    if not shutil.which("systemctl"):
+        return _failure_summary(ConnectorType.LINUX, "systemctl is not available on this host.")
+
+    try:
+        collected = _collect_system_evidence(ConnectorType.LINUX, _run)
     except Exception as exc:
         return _failure_summary(ConnectorType.LINUX, f"Linux evidence collection failed: {exc}")
+
+    evidence = collected["evidence"]
+    actions = [
+        ExecutableAction(
+            id=f"systemd-restart:{service_name}",
+            label=f"Restart {service_name}",
+            action_type=ActionType.RESTART_SYSTEMD_SERVICE,
+            target=service_name,
+            risk_level="high",
+            preconditions=["Service appeared in local systemd failed-unit evidence."],
+            source=ConnectorType.LINUX,
+        )
+        for service_name in collected["failed_services"]
+    ]
 
     status = Severity.CRITICAL if any(item.severity == Severity.CRITICAL for item in evidence) else Severity.INFO
     return {
@@ -289,7 +327,11 @@ def collect_manual_evidence(logs: str | None) -> Dict:
     }
 
 
-def collect_sources(sources: List[ConnectorType], logs: str | None = None) -> Dict:
+def collect_sources(sources: List[ConnectorType],
+            logs: str | None = None,
+            vm_targets: List[str] | None = None, 
+            db=None, 
+            organization_id: str | None = None,) -> Dict:
     summaries: List[SourceSummary] = []
     evidence: List[CollectedEvidence] = []
     actions: List[ExecutableAction] = []
@@ -301,6 +343,12 @@ def collect_sources(sources: List[ConnectorType], logs: str | None = None) -> Di
             result = collect_linux_evidence()
         elif source == ConnectorType.DOCKER:
             result = collect_docker_evidence()
+        elif source == ConnectorType.VM:
+            from connectors_vm import collect_vm_evidence
+            if db is None or organization_id is None:
+                result = _failure_summary(ConnectorType.VM, "VM evidence collection requires an authenticated request context.")
+            else:
+                result = collect_vm_evidence(vm_targets, organization_id, db)
         else:
             continue
 

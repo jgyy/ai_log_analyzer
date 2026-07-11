@@ -1,8 +1,8 @@
 "use client";
 import { useMemo, useState, useRef, useEffect } from "react";
-import { Upload, FileText, X, Loader2, Sparkles, Server, Boxes, Laptop } from "lucide-react";
-import { analyzeIncident } from "@/lib/api";
-import { AnalysisResult, ConnectorType } from "@/lib/types";
+import { Upload, FileText, X, Loader2, Sparkles, Server, Boxes, Laptop, MonitorSmartphone } from "lucide-react";
+import { analyzeIncident, listVMs } from "@/lib/api";
+import { AnalysisResult, ConnectorType, VMInfo } from "@/lib/types";
 import AnalysisTabs from "./AnalysisTab";
 
 interface LogUploaderProps {
@@ -22,13 +22,14 @@ const SAMPLE_LOGS = [
   { label: "Nginx: 502 upstream outage", domain: "nginx", file: "/sample-logs/nginx-502-upstream.log" },
   { label: "System: disk full incident", domain: "system", file: "/sample-logs/system-disk-full.log" },
 ];
-type SourcePreset = "manual" | "linux" | "docker" | "linux-docker";
+type SourcePreset = "manual" | "linux" | "docker" | "linux-docker" | "vm";
 
 const presets: Array<{ id: SourcePreset; label: string; description: string; icon: any; sources: ConnectorType[] }> = [
   { id: "manual", label: "Manual Logs", description: "Paste or upload log text.", icon: FileText, sources: ["manual"] },
   { id: "linux", label: "Linux", description: "Collect local system logs and host signals.", icon: Server, sources: ["linux"] },
   { id: "docker", label: "Docker", description: "Collect local container status and logs.", icon: Boxes, sources: ["docker"] },
   { id: "linux-docker", label: "Linux + Docker", description: "Analyze host and container evidence together.", icon: Laptop, sources: ["linux", "docker"] },
+  { id: "vm", label: "VirtualBox VMs", description: "Inspect VM power state, snapshots, and guest diagnostics.", icon: MonitorSmartphone, sources: ["virtualbox"] },
 ];
 
 export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
@@ -40,10 +41,36 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [loadingSample, setLoadingSample] = useState<string | null>(null);
+  const [vms, setVms] = useState<VMInfo[]>([]);
+  const [selectedVmNames, setSelectedVmNames] = useState<string[]>([]);
+  const [vmLoadError, setVmLoadError] = useState<string | null>(null);
+  const [loadingVms, setLoadingVms] = useState(false);
+  const [vmsFetched, setVmsFetched] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selected = useMemo(() => presets.find((item) => item.id === preset) || presets[0], [preset]);
   const manualRequired = selected.sources.includes("manual");
-  
+  const vmRequired = selected.sources.includes("virtualbox");
+
+  useEffect(() => {
+    if (!vmRequired || vmsFetched || loadingVms) return;
+    setLoadingVms(true);
+    setVmLoadError(null);
+    listVMs()
+      .then((list) => {
+        setVms(list);
+        setSelectedVmNames(list.map((vm) => vm.name));
+      })
+      .catch((err) => setVmLoadError(err.message || "Couldn't load VMs. Is VBoxManage available on the backend host?"))
+      .finally(() => {
+        setLoadingVms(false);
+        setVmsFetched(true);
+      });
+  }, [vmRequired, vmsFetched, loadingVms]);
+ 
+  const toggleVm = (name: string) => {
+    setSelectedVmNames((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
+  };
+
     const handleLoadSample = async (sample: typeof SAMPLE_LOGS[number]) => {
     setLoadingSample(sample.file);
     setError(null);
@@ -83,6 +110,7 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
         sources: selected.sources,
         logs: logs.trim() || undefined,
         domain: domain || "unknown domain",
+        vm_targets: vmRequired ? selectedVmNames : undefined,
       });
       setResult(data.result);
       onAnalysisComplete?.();
@@ -213,6 +241,57 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
               </div>
             </div>
           )}
+
+
+          {vmRequired && (
+            <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-300 font-medium">Select VMs to analyze</p>
+                {loadingVms && <Loader2 className="h-4 w-4 animate-spin text-slate-500" />}
+              </div>
+              {vmLoadError && (
+                <div className="text-amber-400 text-sm bg-amber-900/20 border border-amber-700 rounded p-3">
+                  {vmLoadError}
+                </div>
+              )}
+              {!loadingVms && !vmLoadError && vms.length === 0 && (
+                <p className="text-sm text-slate-500">No VirtualBox VMs found on the backend host.</p>
+              )}
+              {vms.length > 0 && (
+                <div className="space-y-2">
+                  {vms.map((vm) => (
+                    <label
+                      key={vm.name}
+                      className="flex items-center justify-between gap-3 rounded border border-slate-700/60 bg-slate-950/40 px-3 py-2 cursor-pointer hover:border-slate-500"
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedVmNames.includes(vm.name)}
+                          onChange={() => toggleVm(vm.name)}
+                          className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500"
+                        />
+                        <div>
+                          <div className="text-sm font-medium text-slate-200">{vm.name}</div>
+                          <div className="text-xs text-slate-500">
+                            {vm.state}{vm.state === "running" && !vm.guest_additions_running ? " · Guest Additions not running" : ""}
+                            {!vm.has_credentials ? " · no diagnostic credentials configured" : ""}
+                          </div>
+                        </div>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${vm.state === "running" ? "bg-emerald-900/30 text-emerald-400" : "bg-slate-800 text-slate-400"}`}>
+                        {vm.state}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-slate-500">
+                Guest diagnostics only run for VMs with diagnostic credentials configured (under the "VMs" page)
+              </p>
+            </div>
+          )}
+
 
           {/* {!manualRequired && (
             <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 text-sm text-slate-400">

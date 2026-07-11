@@ -26,12 +26,18 @@ MAX_DIAGRAM_ATTEMPTS = 3
 MAX_AI_API_ATTEMPTS = 3
 
 DIAGRAM_INSTRUCTIONS = """
-In addition to the written analysis, populate the "diagrams" object with three valid Mermaid diagrams (as plain Mermaid source text, no markdown code fences) that visualize the SAME content you wrote - the diagrams and text must tell the same story, just in different forms:
-- timeline_flowchart: a Mermaid flowchart (flowchart TD) with one node per investigation stage (Start, Symptom, Observation, Finding, Root Cause), each node's label summarizing that stage in a few words, connected in sequence.
-- root_cause_diagram: a Mermaid flowchart showing how the root cause(s) and hypotheses lead to the observed impact (e.g. root causes and hypotheses as nodes flowing into an "Impact" node).
-- mitigation_flowchart: a Mermaid flowchart of the mitigation phases (Prepare -> Pre-Validate -> Apply -> Post-Validate), with key step titles as short labels, including a rollback branch.
+In addition to the written analysis, populate the "diagrams" object with three valid Mermaid flowcharts (plain Mermaid source only, no markdown code fences) that visualize the SAME content as the written analysis.
 
-Keep node labels short (under 8 words) and always wrap node text in quotes if it contains special characters like parentheses or colons. Never use a Mermaid reserved word (e.g. "end", "class", "click", "style", "subgraph", "direction") as a bare node id.
+Rules:
+- Every diagram MUST start with: flowchart TD
+- Every node MUST have an identifier using Mermaid syntax: NodeId["Label"] (e.g. Start["Start"], RC["Root Cause"]).
+- Never use quoted strings as standalone nodes (e.g. "Root Cause" --> "Impact" is invalid).
+- Keep labels under 8 words.
+- Never use Mermaid reserved keywords (end, class, click, style, subgraph, direction) as node identifiers.
+
+- timeline_flowchart: one node each for Start → Symptom → Observation → Finding → Root Cause, connected in sequence.
+- root_cause_diagram: root cause(s) and hypotheses flowing into an Impact node.
+- mitigation_flowchart: Prepare → Pre-Validate → Apply → Post-Validate, including a rollback branch.
 """
 
 BUSINESS_SUMMARY_INSTRUCTIONS = """
@@ -66,18 +72,40 @@ _RESERVED_NODE_IDS = {"end", "class", "click", "style", "subgraph", "direction"}
 _NODE_DEF_RE = re.compile(r'\b([A-Za-z0-9_-]+)(\[|\(|\{)"?(.*?)"?(\]|\)|\})(?=\s|-->|$)')
 
 
+_HEADER_RE = re.compile(
+    r'^\s*(flowchart|graph)\s+(TB|TD|BT|LR|RL)\b',
+    re.IGNORECASE,
+)
+
 def _diagram_issues(chart: str) -> list[str]:
     issues = []
     text = (chart or "").strip()
+
     if not text:
         return issues
+
     if text.startswith("```"):
-        issues.append("diagram is wrapped in a markdown code fence (```) — return plain Mermaid source only")
+        issues.append(
+            "diagram is wrapped in a markdown code fence (```) — return plain Mermaid source only"
+        )
+
+    if not _HEADER_RE.match(text):
+        issues.append(
+            'diagram must begin with "flowchart TD" (or another valid flowchart direction)'
+        )
+
     for node_id, _open, label, _close in _NODE_DEF_RE.findall(text):
         if node_id.lower() in _RESERVED_NODE_IDS:
-            issues.append(f'node id "{node_id}" is a reserved Mermaid keyword and cannot be used as a node id')
-        if re.search(r'["():{}|;]', label) and not (label.startswith('"') and label.endswith('"')):
-            issues.append(f'label {label!r} contains special characters and must be wrapped in double quotes')
+            issues.append(
+                f'node id "{node_id}" is a reserved Mermaid keyword and cannot be used as a node id'
+            )
+        if re.search(r'["():{}|;]', label) and not (
+            label.startswith('"') and label.endswith('"')
+        ):
+            issues.append(
+                f'label {label!r} contains special characters and must be wrapped in double quotes'
+            )
+
     return issues
 
 

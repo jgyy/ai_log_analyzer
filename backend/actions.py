@@ -11,7 +11,17 @@ def find_action(action_id: str, actions: Iterable[ExecutableAction]) -> Executab
     return None
 
 
-def execute_allowlisted_action(action: ExecutableAction) -> ActionExecutionResponse:
+def execute_allowlisted_action(action: ExecutableAction, confirm: bool = False) -> ActionExecutionResponse:
+    if action.action_type == ActionType.RESTORE_VM_SNAPSHOT and not confirm:
+        return ActionExecutionResponse(
+            action_id=action.id,
+            status="rejected",
+            error=(
+                "Restoring a snapshot discards all guest state since it was taken "
+                "and cannot be undone. Resend this request with confirm=true to proceed."
+            ),
+        )
+
     command = _command_for_action(action)
     if not command:
         return ActionExecutionResponse(
@@ -43,4 +53,12 @@ def _command_for_action(action: ExecutableAction) -> list[str] | None:
         return ["docker", "stop", action.target]
     if action.action_type == ActionType.RESTART_SYSTEMD_SERVICE and action.target.endswith(".service"):
         return ["systemctl", "restart", action.target]
+    if action.action_type == ActionType.START_VM:
+        return ["VBoxManage", "startvm", action.target, "--type", "headless"]
+    if action.action_type == ActionType.STOP_VM:
+        return ["VBoxManage", "controlvm", action.target, "acpipowerbutton"]
+    if action.action_type == ActionType.RESTART_VM:
+        return ["VBoxManage", "controlvm", action.target, "reset"]
+    if action.action_type == ActionType.RESTORE_VM_SNAPSHOT:
+        return ["VBoxManage", "snapshot", action.target, "restorecurrent"]
     return None

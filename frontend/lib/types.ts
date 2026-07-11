@@ -1,6 +1,16 @@
-export type ConnectorType = "manual" | "linux" | "docker";
+export type ConnectorType = "manual" | "linux" | "docker" | "virtualbox";
 export type Severity = "healthy" | "info" | "warning" | "critical";
-export type ActionType = "restart_docker_container" | "start_docker_container" | "stop_docker_container" | "restart_systemd_service";
+export type ActionType = 
+    "restart_docker_container"
+    | "start_docker_container" 
+    | "stop_docker_container" 
+    | "restart_systemd_service"
+    | "start_vm"
+    | "stop_vm"
+    | "restart_vm"
+    | "restore_vm_snapshot"
+    | "restart_gdm_service";
+
 export type BusinessRiskLevel = "Low" | "Medium" | "High" | "Critical";
 
 export interface MitigationStep { title: string; description: string; command_or_action: string }
@@ -89,4 +99,13 @@ export interface AnalysisResult {
   evidence: CollectedEvidence[];
   visual_summary: VisualSummary;
   recommended_actions: ExecutableAction[];
+}
+
+export interface VMInfo {
+  name: string;
+  uuid: string;
+  state: string;
+  guest_additions_running: boolean;
+  has_credentials: boolean;
+  snapshot_count: number;
 }

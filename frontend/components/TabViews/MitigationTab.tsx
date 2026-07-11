@@ -40,13 +40,25 @@ export default function MitigationTab({ data, diagram, actions = [] }: { data: A
   const [actionResult, setActionResult] = useState<string | null>(null);
 
   const handleExecute = async (action: ExecutableAction) => {
-    const approved = window.confirm(`Execute approved action: ${action.label}?\n\nTarget: ${action.target}\nRisk: ${action.risk_level}`);
-    if (!approved) return;
+    const isDestructive = action.action_type === "restore_vm_snapshot";
+ 
+    if (isDestructive) {
+      const typed = window.prompt(
+        `This restores the last snapshot for '${action.target}' and discards ALL guest state since it was taken. This cannot be undone.\n\nType the VM name (${action.target}) to confirm:`
+      );
+      if (typed !== action.target) {
+        if (typed !== null) alert("VM name didn't match — action cancelled.");
+        return;
+      }
+    } else {
+      const approved = window.confirm(`Execute approved action: ${action.label}?\n\nTarget: ${action.target}\nRisk: ${action.risk_level}`);
+      if (!approved) return;
+    }
 
     setRunningAction(action.id);
     setActionResult(null);
     try {
-      const result = await executeAction(action.id);
+      const result = await executeAction(action.id, isDestructive);
       setActionResult(`${action.label}: ${result.status}${result.error ? ` - ${result.error}` : ""}${result.output ? ` - ${result.output}` : ""}`);
     } catch (err: any) {
       setActionResult(err.message || "Action execution failed");

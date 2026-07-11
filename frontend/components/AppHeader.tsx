@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Building2, Shield, Activity, Users, History } from "lucide-react";
+import { LogOut, Building2, Shield, Activity, Users, History, MonitorSmartphone } from "lucide-react";
 import { User } from "@/lib/api";
 
 interface AppHeaderProps {
@@ -49,6 +49,13 @@ export default function AppHeader({ user }: AppHeaderProps) {
               Users
             </Link>
           )}
+          {(user.role === "admin" || user.role === "sre") && (
+            <Link href="/dashboard/vms" className={navLinkClass("/dashboard/vms")}>
+              <MonitorSmartphone className="inline h-4 w-4 mr-2" />
+              VMs
+            </Link>
+          )}
+
         </nav>
 
         <div className="flex items-center gap-6">
