@@ -10,6 +10,9 @@ from connectors import _collect_system_evidence, _evidence, _failure_summary, _r
 from crypto_utils import CredentialEncryptionError, decrypt_value
 from database import VMCredential
 from schemas import ActionType, ConnectorType, ExecutableAction, Severity, SourceSummary
+import logging
+
+logger = logging.getLogger(__name__)
 
 GUEST_COMMAND_TIMEOUT = 15
 # Best-effort parse of VBoxManage's --machinereadable `key="value"` output.
@@ -26,6 +29,7 @@ def _parse_machinereadable(output: str) -> Dict[str, str]:
         match = _KV_PATTERN.match(line.strip())
         if match:
             parsed[match.group(1)] = match.group(2)
+    logger.info(f"_parse_machinereadable output: {parsed}")
     return parsed
 
 
@@ -57,6 +61,7 @@ def list_vms() -> List[Dict[str, str]]:
             "uuid": vm_uuid,
             "state": "running" if vm_uuid in running else "unknown",
         })
+    logger.info(f"_list_vms output: {vms}")
     return vms
 
 
@@ -68,6 +73,8 @@ def get_vm_info(vm_name: str) -> Optional[Dict[str, str]]:
     info = _parse_machinereadable(result.stdout)
 
     snapshot_count = len([k for k in info if re.match(r"^SnapshotName", k)])
+
+    logger.info(f"get_vm_info output: name: {info.get('name', vm_name)}; GA_running: {info.get('GuestAdditionsRunLevel', '0') not in ('0', '')}")
 
     return {
         "name": info.get("name", vm_name),
@@ -89,6 +96,7 @@ def _get_credential(db: Session, organization_id: str, vm_name: str) -> Optional
     if not row:
         return None
     try:
+        logger.info(f"_get_cred: uname: {decrypt_value(row.encrypted_username)}")
         return decrypt_value(row.encrypted_username), decrypt_value(row.encrypted_password)
     except CredentialEncryptionError:
         return None
@@ -115,6 +123,7 @@ def _guest_run(vm_name: str, username: str, password: str, shell_command: str, t
     pass a longer timeout than GUEST_COMMAND_TIMEOUT.
     """
     try:
+        logger.info("entered _guest_run")
         return _run(
             [
                 "VBoxManage", "guestcontrol", vm_name, "run",
@@ -127,11 +136,13 @@ def _guest_run(vm_name: str, username: str, password: str, shell_command: str, t
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
+        logger.error("_guest_run TimeoutExpired")
         return subprocess.CompletedProcess(
             args=[], returncode=-1, stdout="",
             stderr=f"guestcontrol command timed out after {timeout}s",
         )
     except Exception as exc:
+        logger.error("_guest_run Exception")
         return subprocess.CompletedProcess(
             args=[], returncode=-1, stdout="", stderr=f"guestcontrol command failed: {exc}",
         )
@@ -155,12 +166,15 @@ def _collect_guest_diagnostics(vm_name: str, username: str, password: str) -> Li
     adding a rarely-useful signal.
     """
     def guest_run(command: List[str], timeout: int = GUEST_COMMAND_TIMEOUT) -> subprocess.CompletedProcess:
+        logger.info("_collect_guest_diagnostic - guest_run")
         return _guest_run(vm_name, username, password, " ".join(command), timeout=timeout)
 
     collected = _collect_system_evidence(ConnectorType.VM, guest_run, component_prefix=f"vm:{vm_name}:")
+    logger.info(f"collected: {collected}")
     evidence = collected["evidence"]
     any_succeeded = collected["any_command_succeeded"]
 
+    logger.info(f"any_succeeded: {any_succeeded}")
     # Display-stack crash signature (gdm-x-session Fatal server error, X
     # display retry exhaustion) — the exact pattern behind the black-screen
     # / non-blinking-cursor failure this connector was built to catch.
@@ -170,6 +184,7 @@ def _collect_guest_diagnostics(vm_name: str, username: str, password: str) -> Li
         "journalctl -u gdm3 -b --no-pager 2>/dev/null | tail -n 200",
     )
     if gdm_journal.returncode == 0:
+        logger.info("gdm_journal returncode 0")
         any_succeeded = True
         text = gdm_journal.stdout
         if "Fatal server error" in text or "maximum number of X display failures reached" in text:
@@ -185,6 +200,7 @@ def _collect_guest_diagnostics(vm_name: str, username: str, password: str) -> Li
             ))
 
     if not any_succeeded:
+        logger.error("Could not run diagnostic commands in guest")
         evidence.append(_evidence(
             ConnectorType.VM,
             f"vm:{vm_name}:guest-access",

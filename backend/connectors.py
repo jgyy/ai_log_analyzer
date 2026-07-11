@@ -7,7 +7,9 @@ from datetime import datetime
 from typing import Callable, Dict, List
 
 from schemas import ActionType, CollectedEvidence, ConnectorType, EvidenceMetadata, ExecutableAction, Severity, SourceSummary
+import logging
 
+logger  = logging.getLogger(__name__)
 
 ERROR_PATTERN = re.compile(r"\b(error|failed|fatal|critical|panic|oom|denied|unhealthy)\b", re.IGNORECASE)
 SERVICE_PATTERN = re.compile(r"([a-zA-Z0-9_.@-]+\.service)")
@@ -70,11 +72,14 @@ def _collect_system_evidence(
 
     def safe_run(command: List[str]) -> subprocess.CompletedProcess:
         try:
+            logger.info("safe_run in _collect_system_evidence")
             return run(command)
         except Exception as exc:
+            logger.error(f"exception in safe_run: {exc}")
             return subprocess.CompletedProcess(args=command, returncode=-1, stdout="", stderr=str(exc))
 
     failed = safe_run(["systemctl", "--failed", "--no-legend", "--plain"])
+    logger.info(f"systemctl --failed...: {failed}")
     if failed.returncode == 0:
         any_command_succeeded = True
         for line in failed.stdout.splitlines()[:20]:
@@ -92,6 +97,7 @@ def _collect_system_evidence(
             ))
 
     journal = safe_run(["journalctl", "-p", "warning..emerg", "-n", "120", "--no-pager", "-o", "short-iso"])
+    logger.info(f"journalctl -p...: {journal}")
     if journal.returncode == 0:
         any_command_succeeded = True
         for line in journal.stdout.splitlines()[-80:]:
@@ -101,6 +107,7 @@ def _collect_system_evidence(
                 evidence.append(_evidence(source, f"{component_prefix}{component}", line, Severity.WARNING))
 
     disk = safe_run(["df", "-h", "/"])
+    logger.info(f"df -h...: {disk}")
     if disk.returncode == 0:
         any_command_succeeded = True
         if disk.stdout.strip():
@@ -122,6 +129,7 @@ def _collect_system_evidence(
                 ))
 
     memory = safe_run(["free", "-m"])
+    logger.info(f"free -m: {memory}")
     if memory.returncode == 0:
         any_command_succeeded = True
         if memory.stdout.strip():
@@ -139,6 +147,9 @@ def _collect_system_evidence(
         if uptime.stdout.strip():
             evidence.append(_evidence(source, f"{component_prefix}load", uptime.stdout.strip(), Severity.INFO))
 
+    logger.info(f"evidence: {evidence}")
+    logger.info(f"failed_service: {failed_services}")
+    logger.info(f"any_cmd_succeeded: {any_command_succeeded}")
     return {
         "evidence": evidence,
         "failed_services": failed_services,
