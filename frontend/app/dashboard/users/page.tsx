@@ -108,10 +108,10 @@ export default function UserManagement() {
       <AppHeader user={currentUser} />
 
       <main className="w-full px-6 py-8">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-100">User Management</h1>
-            <p className="text-slate-400">Manage access for {currentUser.organization_name}</p>
+            <p className="text-sm text-slate-400">{currentUser.organization_name}</p>
           </div>
           <button 
             onClick={() => setShowCreateModal(true)}

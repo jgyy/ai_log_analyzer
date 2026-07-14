@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAnalysisHistory, getCurrentUser, User, type AnalysisHistory } from "@/lib/api";
+import { getAnalysisHistory, getCurrentUser, User, shortAnalysisId, type AnalysisHistory } from "@/lib/api";
 import Link from "next/link";
 import { FileText, Clock, Search } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
@@ -50,9 +50,8 @@ export default function AnalysisHistory() {
       <AppHeader user={user} />
 
       <main className="w-full px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-100 mb-2">Analysis History</h1>
-          <p className="text-slate-400">View all your previous log analyses</p>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-100">Analysis History</h1>
         </div>
 
         {/* Search */}
@@ -60,7 +59,7 @@ export default function AnalysisHistory() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-500" />
           <input
             type="text"
-            placeholder="Search by domain (kubernetes, nginx, system)..."
+            placeholder="Search by domain..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -91,6 +90,7 @@ export default function AnalysisHistory() {
                       <div className="font-semibold text-slate-200 capitalize text-lg">
                         {analysis.domain} Analysis
                       </div>
+                      <div className="font-mono text-xs text-slate-500">#{shortAnalysisId(analysis.id)}</div>
                     </div>
                   </div>
                   

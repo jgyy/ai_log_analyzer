@@ -12,6 +12,12 @@ export function getToken() {
   return localStorage.getItem('token');
 }
 
+// Short, human-shareable analysis reference derived from the stable backend id
+// (e.g. "a1b2c3d4-..." -> "A1B2C3D4"). Stable across renders and reloads.
+export function shortAnalysisId(id: string): string {
+  return id.replace(/-/g, "").slice(0, 8).toUpperCase();
+}
+
 export interface User {
   id: string;
   email: string;

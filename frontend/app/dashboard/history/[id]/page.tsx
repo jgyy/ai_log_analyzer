@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { getCurrentUser, User, apiRequest } from "@/lib/api";
+import { getCurrentUser, User, apiRequest, shortAnalysisId } from "@/lib/api";
 import Link from "next/link";
 import { Clock } from "lucide-react";
 import AnalysisTabs from "@/components/AnalysisTab";
@@ -67,8 +67,9 @@ export default function AnalysisDetail() {
               <Link href="/dashboard/history" className="text-sm text-slate-400 hover:text-slate-200 mb-1 inline-block">
                 ← Back to History
               </Link>
-              <h1 className="text-2xl font-bold text-slate-100 capitalize mb-1">
+              <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-100 capitalize mb-1">
                 {analysis.domain} Analysis
+                <span className="font-mono text-sm font-normal text-slate-500">#{shortAnalysisId(analysis.id)}</span>
               </h1>
               <div className="flex items-center gap-4 text-sm text-slate-400">
                 <span className="flex items-center gap-1">
