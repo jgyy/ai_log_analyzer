@@ -329,8 +329,9 @@ def collect_manual_evidence(logs: str | None) -> Dict:
 
 def collect_sources(sources: List[ConnectorType],
             logs: str | None = None,
-            vm_targets: List[str] | None = None, 
-            db=None, 
+            vm_targets: List[str] | None = None,
+            remote_targets: List[str] | None = None,
+            db=None,
             organization_id: str | None = None,) -> Dict:
     summaries: List[SourceSummary] = []
     evidence: List[CollectedEvidence] = []
@@ -349,6 +350,12 @@ def collect_sources(sources: List[ConnectorType],
                 result = _failure_summary(ConnectorType.VM, "VM evidence collection requires an authenticated request context.")
             else:
                 result = collect_vm_evidence(vm_targets, organization_id, db)
+        elif source == ConnectorType.REMOTE:
+            from connectors_remote import collect_remote_evidence
+            if db is None or organization_id is None:
+                result = _failure_summary(ConnectorType.REMOTE, "Remote evidence collection requires an authenticated request context.")
+            else:
+                result = collect_remote_evidence(remote_targets, organization_id, db)
         else:
             continue
 

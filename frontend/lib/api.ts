@@ -1,4 +1,4 @@
-import { AnalysisResult, ConnectorType, VMInfo } from "@/lib/types";
+import { AnalysisResult, ConnectorType, RemoteAuthMethod, RemoteTargetInfo, VMInfo } from "@/lib/types";
 
 // Base URL of the backend API. Defaults to localhost for local dev so
 // `npm run dev` keeps working without any extra configuration. In production
@@ -111,14 +111,15 @@ export async function analyzeLogs(logs: string, domain: string = 'kubernetes') {
   });
 }
 
-export async function analyzeIncident(payload: { sources: ConnectorType[], logs?: string, domain?: string, vm_targets?: string[] }) {
+export async function analyzeIncident(payload: { sources: ConnectorType[], logs?: string, domain?: string, vm_targets?: string[], remote_targets?: string[] }) {
   return apiRequest('/api/incidents/analyze', {
     method: 'POST',
     body: JSON.stringify({
       sources: payload.sources,
       logs: payload.logs,
       domain: payload.domain || 'infrastructure',
-      vm_targets: payload.vm_targets
+      vm_targets: payload.vm_targets,
+      remote_targets: payload.remote_targets
     }),
   });
 }
@@ -143,6 +144,28 @@ export async function setVMCredentials(vmName: string, username: string, passwor
  
 export async function deleteVMCredentials(vmName: string) {
   return apiRequest(`/api/vms/${encodeURIComponent(vmName)}/credentials`, { method: 'DELETE' });
+}
+
+export async function listRemoteTargets(): Promise<RemoteTargetInfo[]> {
+  return apiRequest('/api/remote-targets');
+}
+
+export async function upsertRemoteTarget(target: {
+  name: string;
+  host: string;
+  port?: number;
+  username: string;
+  auth_method: RemoteAuthMethod;
+  secret: string;
+}) {
+  return apiRequest('/api/remote-targets', {
+    method: 'POST',
+    body: JSON.stringify({ port: 22, ...target }),
+  });
+}
+
+export async function deleteRemoteTarget(name: string) {
+  return apiRequest(`/api/remote-targets/${encodeURIComponent(name)}`, { method: 'DELETE' });
 }
 
 export async function getAnalyses() {

@@ -1,8 +1,8 @@
 "use client";
 import { useMemo, useState, useRef, useEffect } from "react";
-import { Upload, FileText, X, Loader2, Sparkles, Server, Boxes, Laptop, MonitorSmartphone } from "lucide-react";
-import { analyzeIncident, listVMs, shortAnalysisId } from "@/lib/api";
-import { AnalysisResult, ConnectorType, VMInfo } from "@/lib/types";
+import { Upload, FileText, X, Loader2, Sparkles, Server, Boxes, Laptop, MonitorSmartphone, Globe, Plus } from "lucide-react";
+import { analyzeIncident, listVMs, listRemoteTargets, upsertRemoteTarget, shortAnalysisId } from "@/lib/api";
+import { AnalysisResult, ConnectorType, RemoteAuthMethod, RemoteTargetInfo, VMInfo } from "@/lib/types";
 import AnalysisTabs from "./AnalysisTab";
 
 interface LogUploaderProps {
@@ -22,7 +22,7 @@ const SAMPLE_LOGS = [
   { label: "Nginx: 502 upstream outage", domain: "nginx", file: "/sample-logs/nginx-502-upstream.log" },
   { label: "System: disk full incident", domain: "system", file: "/sample-logs/system-disk-full.log" },
 ];
-type SourcePreset = "manual" | "linux" | "docker" | "linux-docker" | "vm";
+type SourcePreset = "manual" | "linux" | "docker" | "linux-docker" | "vm" | "remote";
 
 const presets: Array<{ id: SourcePreset; label: string; description: string; icon: any; sources: ConnectorType[] }> = [
   { id: "manual", label: "Manual Logs", description: "Paste or upload log text.", icon: FileText, sources: ["manual"] },
@@ -30,7 +30,10 @@ const presets: Array<{ id: SourcePreset; label: string; description: string; ico
   { id: "docker", label: "Docker", description: "Collect local container status and logs.", icon: Boxes, sources: ["docker"] },
   { id: "linux-docker", label: "Linux + Docker", description: "Analyze host and container evidence together.", icon: Laptop, sources: ["linux", "docker"] },
   { id: "vm", label: "VirtualBox VMs", description: "Inspect VM power state, snapshots, and guest diagnostics.", icon: MonitorSmartphone, sources: ["virtualbox"] },
+  { id: "remote", label: "Remote / VM (SSH)", description: "Connect to any remote host, cloud VM, or external system over SSH.", icon: Globe, sources: ["remote"] },
 ];
+
+const DEFAULT_REMOTE_FORM = { name: "", host: "", port: "22", username: "", auth_method: "password" as RemoteAuthMethod, secret: "" };
 
 export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
   const [preset, setPreset] = useState<SourcePreset>("linux-docker");
@@ -47,10 +50,20 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
   const [vmLoadError, setVmLoadError] = useState<string | null>(null);
   const [loadingVms, setLoadingVms] = useState(false);
   const [vmsFetched, setVmsFetched] = useState(false);
+  const [remoteTargets, setRemoteTargets] = useState<RemoteTargetInfo[]>([]);
+  const [selectedRemoteNames, setSelectedRemoteNames] = useState<string[]>([]);
+  const [remoteLoadError, setRemoteLoadError] = useState<string | null>(null);
+  const [loadingRemote, setLoadingRemote] = useState(false);
+  const [remoteFetched, setRemoteFetched] = useState(false);
+  const [showAddRemote, setShowAddRemote] = useState(false);
+  const [remoteForm, setRemoteForm] = useState(DEFAULT_REMOTE_FORM);
+  const [savingRemote, setSavingRemote] = useState(false);
+  const [remoteFormError, setRemoteFormError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selected = useMemo(() => presets.find((item) => item.id === preset) || presets[0], [preset]);
   const manualRequired = selected.sources.includes("manual");
   const vmRequired = selected.sources.includes("virtualbox");
+  const remoteRequired = selected.sources.includes("remote");
 
   useEffect(() => {
     if (!vmRequired || vmsFetched || loadingVms) return;
@@ -70,6 +83,56 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
  
   const toggleVm = (name: string) => {
     setSelectedVmNames((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
+  };
+
+  const loadRemoteTargets = () => {
+    setLoadingRemote(true);
+    setRemoteLoadError(null);
+    listRemoteTargets()
+      .then((list) => {
+        setRemoteTargets(list);
+        setSelectedRemoteNames(list.map((t) => t.name));
+      })
+      .catch((err) => setRemoteLoadError(err.message || "Couldn't load remote targets."))
+      .finally(() => {
+        setLoadingRemote(false);
+        setRemoteFetched(true);
+      });
+  };
+
+  useEffect(() => {
+    if (!remoteRequired || remoteFetched || loadingRemote) return;
+    loadRemoteTargets();
+  }, [remoteRequired, remoteFetched, loadingRemote]);
+
+  const toggleRemote = (name: string) => {
+    setSelectedRemoteNames((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
+  };
+
+  const handleAddRemoteTarget = async () => {
+    setRemoteFormError(null);
+    if (!remoteForm.name.trim() || !remoteForm.host.trim() || !remoteForm.username.trim() || !remoteForm.secret.trim()) {
+      setRemoteFormError("Name, host, username, and password/key are required.");
+      return;
+    }
+    setSavingRemote(true);
+    try {
+      await upsertRemoteTarget({
+        name: remoteForm.name.trim(),
+        host: remoteForm.host.trim(),
+        port: Number(remoteForm.port) || 22,
+        username: remoteForm.username.trim(),
+        auth_method: remoteForm.auth_method,
+        secret: remoteForm.secret,
+      });
+      setRemoteForm(DEFAULT_REMOTE_FORM);
+      setShowAddRemote(false);
+      loadRemoteTargets();
+    } catch (err: any) {
+      setRemoteFormError(err.message || "Couldn't save remote target.");
+    } finally {
+      setSavingRemote(false);
+    }
   };
 
     const handleLoadSample = async (sample: typeof SAMPLE_LOGS[number]) => {
@@ -113,6 +176,7 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
         logs: logs.trim() || undefined,
         domain: domain || "unknown domain",
         vm_targets: vmRequired ? selectedVmNames : undefined,
+        remote_targets: remoteRequired ? selectedRemoteNames : undefined,
       });
       setResult(data.result);
       setResultId(data.id ?? null);
@@ -298,6 +362,131 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
             </div>
           )}
 
+
+          {remoteRequired && (
+            <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-300 font-medium">Select remote targets to analyze</p>
+                {loadingRemote && <Loader2 className="h-4 w-4 animate-spin text-slate-500" />}
+              </div>
+              {remoteLoadError && (
+                <div className="text-amber-400 text-sm bg-amber-900/20 border border-amber-700 rounded p-3">
+                  {remoteLoadError}
+                </div>
+              )}
+              {!loadingRemote && !remoteLoadError && remoteTargets.length === 0 && (
+                <p className="text-sm text-slate-500">No remote targets configured yet. Add one below.</p>
+              )}
+              {remoteTargets.length > 0 && (
+                <div className="space-y-2">
+                  {remoteTargets.map((target) => (
+                    <label
+                      key={target.name}
+                      className="flex items-center justify-between gap-3 rounded border border-slate-700/60 bg-slate-950/40 px-3 py-2 cursor-pointer hover:border-slate-500"
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedRemoteNames.includes(target.name)}
+                          onChange={() => toggleRemote(target.name)}
+                          className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500"
+                        />
+                        <div>
+                          <div className="text-sm font-medium text-slate-200">{target.name}</div>
+                          <div className="text-xs text-slate-500">
+                            {target.username}@{target.host}:{target.port} · {target.auth_method === "ssh_key" ? "SSH key" : "password"}
+                          </div>
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {!showAddRemote ? (
+                <button
+                  onClick={() => setShowAddRemote(true)}
+                  className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add remote target
+                </button>
+              ) : (
+                <div className="rounded border border-slate-700/60 bg-slate-950/40 p-3 space-y-2">
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <input
+                      placeholder="Name (e.g. prod-web-1)"
+                      value={remoteForm.name}
+                      onChange={(e) => setRemoteForm({ ...remoteForm, name: e.target.value })}
+                      className="bg-slate-900/50 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      placeholder="Host or IP"
+                      value={remoteForm.host}
+                      onChange={(e) => setRemoteForm({ ...remoteForm, host: e.target.value })}
+                      className="bg-slate-900/50 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      placeholder="Port"
+                      value={remoteForm.port}
+                      onChange={(e) => setRemoteForm({ ...remoteForm, port: e.target.value })}
+                      className="bg-slate-900/50 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      placeholder="Username"
+                      value={remoteForm.username}
+                      onChange={(e) => setRemoteForm({ ...remoteForm, username: e.target.value })}
+                      className="bg-slate-900/50 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <select
+                      value={remoteForm.auth_method}
+                      onChange={(e) => setRemoteForm({ ...remoteForm, auth_method: e.target.value as RemoteAuthMethod })}
+                      className="bg-slate-900/50 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="password">Password</option>
+                      <option value="ssh_key">SSH private key</option>
+                    </select>
+                    {remoteForm.auth_method === "password" ? (
+                      <input
+                        type="password"
+                        placeholder="Password"
+                        value={remoteForm.secret}
+                        onChange={(e) => setRemoteForm({ ...remoteForm, secret: e.target.value })}
+                        className="bg-slate-900/50 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <textarea
+                        placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."
+                        value={remoteForm.secret}
+                        onChange={(e) => setRemoteForm({ ...remoteForm, secret: e.target.value })}
+                        className="md:col-span-2 h-20 bg-slate-900/50 border border-slate-700 rounded px-2 py-1.5 font-mono text-xs text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    )}
+                  </div>
+                  {remoteFormError && <div className="text-red-400 text-xs">{remoteFormError}</div>}
+                  <div className="flex gap-2">
+                    <button
+                      disabled={savingRemote}
+                      onClick={handleAddRemoteTarget}
+                      className="px-3 py-1.5 text-xs rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white flex items-center gap-1.5"
+                    >
+                      {savingRemote && <Loader2 className="h-3 w-3 animate-spin" />}
+                      Save target
+                    </button>
+                    <button
+                      onClick={() => { setShowAddRemote(false); setRemoteFormError(null); }}
+                      className="px-3 py-1.5 text-xs rounded border border-slate-700 text-slate-300 hover:border-slate-500"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-slate-500">
+                Credentials are encrypted at rest and never displayed again. Diagnostics run over SSH
+                and require standard Linux tooling (systemctl/journalctl/df/free) on the target.
+              </p>
+            </div>
+          )}
 
           {/* {!manualRequired && (
             <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 text-sm text-slate-400">

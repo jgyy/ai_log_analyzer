@@ -13,6 +13,11 @@ class ConnectorType(str, Enum):
     LINUX = "linux"
     DOCKER = "docker"
     VM = "virtualbox"
+    REMOTE = "remote"
+
+class RemoteAuthMethod(str, Enum):
+    PASSWORD = "password"
+    SSH_KEY = "ssh_key"
 
 class Severity(str, Enum):
     HEALTHY = "healthy"
@@ -211,6 +216,7 @@ class IncidentAnalysisRequest(BaseModel):
     logs: Optional[str] = None
     domain: str = "infrastructure"
     vm_targets: Optional[List[str]] = None  # VM names to inspect, only used when ConnectorType.VM is in sources
+    remote_targets: Optional[List[str]] = None  # Remote target names to inspect, only used when ConnectorType.REMOTE is in sources
 
 class ActionExecutionRequest(BaseModel):
     confirm: bool = False
@@ -251,3 +257,36 @@ class VMCredentialStatus(BaseModel):
     configured: bool
     created_at: Optional[datetime] = None
 #---end VM (VirtualBox) schemas---
+
+#---start Remote host (SSH) schemas---
+# A generic, extensible connection profile for any remote/external log
+# source reachable over SSH (a bare-metal box, a cloud VM, a network
+# appliance, etc). This is intentionally the first of what should become a
+# small family of "remote source" types (e.g. future REST/API-based
+# sources) — RemoteTargetInfo/RemoteTargetCreate only assume "how do we
+# authenticate and where do we connect", not anything SSH-specific, so a
+# non-SSH remote type could reuse the same shape with a different
+# auth_method/collector.
+class RemoteTargetCreate(BaseModel):
+    name: str = Field(..., description="Friendly, org-unique label for this remote target.")
+    host: str
+    port: int = 22
+    username: str
+    auth_method: RemoteAuthMethod = RemoteAuthMethod.PASSWORD
+    # Password when auth_method=password, private key contents (PEM) when auth_method=ssh_key.
+    secret: str
+
+class RemoteTargetInfo(BaseModel):
+    name: str
+    host: str
+    port: int
+    username: str
+    auth_method: RemoteAuthMethod
+    configured: bool = True
+    created_at: Optional[datetime] = None
+
+class RemoteTargetStatus(BaseModel):
+    name: str
+    configured: bool
+    created_at: Optional[datetime] = None
+#---end Remote host (SSH) schemas---
