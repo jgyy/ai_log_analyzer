@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { Upload, FileText, X, Loader2, Sparkles, Server, Boxes, Laptop, MonitorSmartphone } from "lucide-react";
-import { analyzeIncident, listVMs } from "@/lib/api";
+import { analyzeIncident, listVMs, shortAnalysisId } from "@/lib/api";
 import { AnalysisResult, ConnectorType, VMInfo } from "@/lib/types";
 import AnalysisTabs from "./AnalysisTab";
 
@@ -39,6 +39,7 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [resultId, setResultId] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [loadingSample, setLoadingSample] = useState<string | null>(null);
   const [vms, setVms] = useState<VMInfo[]>([]);
@@ -105,6 +106,7 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
     setLoading(true);
     setError(null);
     setResult(null);
+    setResultId(null);
     try {
       const data = await analyzeIncident({
         sources: selected.sources,
@@ -113,6 +115,7 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
         vm_targets: vmRequired ? selectedVmNames : undefined,
       });
       setResult(data.result);
+      setResultId(data.id ?? null);
       onAnalysisComplete?.();
     } catch (err: any) {
       setError(err.message || "Analysis failed. Check backend, connector access, and API key.");
@@ -145,19 +148,18 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
   };
 
   return (
-    <div className="w-full px-6 py-6 space-y-8">
-      <header className="text-center space-y-2">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
-          DevOps AI Log Analyzer
-        </h1>
-        <p className="text-slate-400">
-          Pull local Linux and Docker evidence, structure it for AI analysis, and generate an explainable mitigation plan.
-        </p>
+    <div className="w-full max-w-5xl mx-auto space-y-6">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-bold text-slate-100">New incident analysis</h1>
+        <p className="text-sm text-slate-400">Choose a source, add logs, and analyze.</p>
       </header>
       <div>
-        <div className="glass rounded-xl p-6 space-y-5 card-hover">
+        <div className="glass rounded-xl p-6 space-y-5 card-hover border border-slate-800">
           <div>
-            <div className="mb-3 text-sm font-medium text-slate-300">Evidence source</div>
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-300">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/20 text-xs font-semibold text-blue-300">1</span>
+              Choose evidence source
+            </div>
             <div className="grid gap-3 md:grid-cols-4">
               {presets.map((item) => {
                 const Icon = item.icon;
@@ -180,10 +182,14 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
           </div>
 
           {manualRequired && (
-            <div className="space-y-4">
+            <div className="space-y-4 border-t border-slate-800 pt-5">
+              <div className="mb-1 flex items-center gap-2 text-sm font-medium text-slate-300">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/20 text-xs font-semibold text-blue-300">2</span>
+                Add logs
+              </div>
               <div>
-              <p className="text-sm text-slate-400 mb-2 flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-blue-400" /> New here? Try a sample incident:
+              <p className="text-xs text-slate-500 mb-2 flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-blue-400" /> Or try a sample:
               </p>
               <div className="flex flex-wrap gap-2">
                 {SAMPLE_LOGS.map((sample) => (
@@ -304,10 +310,10 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
           <button
             disabled={loading}
             onClick={handleSubmit}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium flex items-center justify-center gap-2 transition-all"
+            className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-base flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-950/40"
           >
             {loading ? <Loader2 className="animate-spin h-5 w-5" /> : <FileText className="h-5 w-5" />}
-            {loading ? "Analyzing Incident..." : `Analyze ${selected.label}`}
+            {loading ? "Analyzing incident..." : `Analyze ${selected.label}`}
           </button>
         </div>
 
@@ -323,7 +329,17 @@ export default function LogUploader({ onAnalysisComplete }: LogUploaderProps) {
           </div>
         )}
 
-        {result && !loading && <AnalysisTabs data={result} />}
+        {result && !loading && (
+          <div className="space-y-3">
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-200 capitalize">
+              {domain} Analysis
+              {resultId && (
+                <span className="font-mono text-xs font-normal text-slate-500">#{shortAnalysisId(resultId)}</span>
+              )}
+            </h2>
+            <AnalysisTabs data={result} />
+          </div>
+        )}
       </div>
     </div>
   );
