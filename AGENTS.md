@@ -1,6 +1,10 @@
-<!-- ai_log_analyzer, project-root CLAUDE.md. Keep this lean and repo-wide;
-     anchor guidance on stable paths and symbols, not counts that rot.
-     No em dashes, en dashes, or emojis. -->
+<!-- ai_log_analyzer, project-root AGENTS.md. AI-agent-agnostic entry point:
+     followed by Claude Code, Codex, Cursor, or any other coding agent. Keep
+     this lean and repo-wide; each subdirectory listed below has its own
+     local AGENTS.md with area-specific guidance, loaded on demand when an
+     agent works there — do not duplicate that detail here. Anchor guidance
+     on stable paths and symbols, not counts that rot. No em dashes, en
+     dashes, or emojis. -->
 
 # DevOps AI Log Analyzer
 
@@ -15,20 +19,11 @@ before making structural changes; this file is the quick orientation + conventio
 ## Repo map
 | Path | What it is |
 |---|---|
-| `backend/main.py` | FastAPI routes and request orchestration; both `/api/analyze` (legacy) and `/api/incidents/analyze` (current) endpoints. |
-| `backend/ai_service.py` | Gemini/Claude integration: provider selection, retries, Mermaid diagram validation/regeneration. |
-| `backend/connectors.py` / `connectors_vm.py` | Local manual/Linux/Docker evidence collection, and remote VM evidence collection. |
-| `backend/actions.py` | Allowlisted remediation action execution — never add a new action without it being explicitly allowlisted. |
-| `backend/schemas.py` | Pydantic API and AI response schemas — the contract between backend and frontend `lib/types.ts`. |
-| `backend/database.py` | SQLAlchemy models: users, organizations, analysis history, audit logs. |
-| `backend/auth.py` | JWT auth, role checks, bcrypt password hashing. |
-| `backend/crypto_utils.py` | Secret/credential encryption helpers for stored connector config. |
-| `backend/log_processor.py` | Manual log preprocessing before it reaches the AI service. |
-| `frontend/components/LogUploader.tsx` | Main source-selection + Analyze workflow entry point. |
-| `frontend/components/MermaidDiagram.tsx` | Mermaid rendering with a defensive sanitizer as the final safety net. |
-| `frontend/components/TabViews/` | Timeline, root cause, mitigation, overview result views. |
-| `frontend/lib/api.ts` | Backend API client; `frontend/lib/types.ts` mirrors backend response schemas. |
+| `backend/` | FastAPI service (flat layout: routes, AI integration, connectors, actions, auth). See `backend/AGENTS.md`. |
+| `frontend/` | Next.js 14 dashboard; see `frontend/AGENTS.md` (and `frontend/app/`, `frontend/components/`, `frontend/components/TabViews/`, `frontend/lib/` for their own `AGENTS.md`). |
 | `docs/ai-dev/` | AI-assisted development notes for this repo. |
+
+Most directories above have their own `AGENTS.md`; read it when you work there.
 
 ## Commands
 - Backend: `cd backend && uvicorn main:app --reload`; tests are Python `unittest` (`test_*.py`).
