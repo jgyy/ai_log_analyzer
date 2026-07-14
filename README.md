@@ -205,4 +205,4 @@ The primary goal of this project was to build a system that can perform analysis
 
 ### Next steps
 
-Solution documentation generation (turning a resolved incident into a runbook) and expanding connectors to reduce on-call engineer load further, per the roadmap in `PLAN.md`.
+Solution documentation generation and expanding connectors to reduce on-call engineer load further, per the roadmap in `PLAN.md`.
