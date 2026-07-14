@@ -1,4 +1,10 @@
 import { AnalysisResult, ConnectorType, VMInfo } from "@/lib/types";
+
+// Base URL of the backend API. Defaults to localhost for local dev so
+// `npm run dev` keeps working without any extra configuration. In production
+// (e.g. on Vercel), set NEXT_PUBLIC_API_URL to the deployed backend's URL.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 let token: string | null = null;
 
 export function setToken(t: string | null) {
@@ -35,7 +41,7 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
   
-  const res = await fetch(`http://localhost:8000${endpoint}`, {
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: headers as HeadersInit,
   });
