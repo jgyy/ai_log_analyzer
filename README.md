@@ -78,6 +78,12 @@ flowchart LR
 
 ## Installation
 
+### Quick start
+
+`./dev.sh` installs deps, creates `.env` files from the examples on first
+run, and starts both dev servers in a `tmux` session (`backend`/`frontend`
+windows). `./dev.sh stop` tears it down. Manual steps below if you prefer.
+
 ### 1. Backend Setup
 
 Requires Python 3.11–3.13 (pydantic-core does not yet have prebuilt wheels for 3.14; if you only have 3.14 installed, use [uv](https://docs.astral.sh/uv/) to fetch a compatible interpreter as shown below).
