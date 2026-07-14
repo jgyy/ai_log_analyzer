@@ -199,7 +199,7 @@ The primary goal of this project was to build a system that can perform analysis
 
 ### Known limitations (current MVP scope)
 
-- **Connectors are local-only.** Automated log collection targets the host machine or local Docker daemon; there is no SSH, Kubernetes API, or cloud-provider (CloudWatch/Stackdriver) connector yet. See `ARCHITECTURE.md`'s "Future Connector Ideas" for the planned Kubernetes/cloud connector shapes.
+- **Most connectors are local-only, with one remote exception.** Automated log collection targets the host machine, the local Docker daemon, or local VirtualBox VMs by default. A generic SSH-based connector (`backend/connectors_remote.py`) now covers arbitrary remote hosts/cloud VMs — configure a connection profile under "Remote / VM (SSH)" and it reuses the same failure-signature checks as the Linux connector. There is still no Kubernetes API or cloud-provider (CloudWatch/Stackdriver) connector. See `ARCHITECTURE.md`'s "Future Connector Ideas" for the planned Kubernetes/cloud connector shapes.
 - **Analysis runs synchronously.** A large log analysis blocks the HTTP request until the AI provider responds; there's no background job queue yet for long-running or batched analyses.
 - **Tested mainly against Kubernetes-style logs.** Nginx and system log support exists but has seen less real-world validation than the Kubernetes path.
 

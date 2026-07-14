@@ -1,4 +1,5 @@
-export type ConnectorType = "manual" | "linux" | "docker" | "virtualbox";
+export type ConnectorType = "manual" | "linux" | "docker" | "virtualbox" | "remote";
+export type RemoteAuthMethod = "password" | "ssh_key";
 export type Severity = "healthy" | "info" | "warning" | "critical";
 export type ActionType = 
     "restart_docker_container"
@@ -108,4 +109,14 @@ export interface VMInfo {
   guest_additions_running: boolean;
   has_credentials: boolean;
   snapshot_count: number;
+}
+
+export interface RemoteTargetInfo {
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  auth_method: RemoteAuthMethod;
+  configured: boolean;
+  created_at?: string | null;
 }

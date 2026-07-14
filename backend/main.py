@@ -7,13 +7,14 @@ import uuid
 import os
 
 
-from database import get_db, User, Organization, LogAnalysis, AuditLog, VMCredential
+from database import get_db, User, Organization, LogAnalysis, AuditLog, VMCredential, RemoteTarget
 from schemas import (
     UserCreate, UserLogin, Token, UserResponse, UserRoleUpdate,
     OrganizationCreate, OrganizationResponse,
     LogAnalysisRequest, LogAnalysisResponse, AnalysisResult,
     IncidentAnalysisRequest, IncidentAnalysisResponse, ActionExecutionResponse,
-    ActionExecutionRequest, VMInfo, VMCredentialCreate, VMCredentialStatus, ActionType
+    ActionExecutionRequest, VMInfo, VMCredentialCreate, VMCredentialStatus, ActionType,
+    RemoteTargetCreate, RemoteTargetInfo, RemoteTargetStatus,
 )
 from ai_service import AIService
 from log_processor import preprocess_logs
@@ -279,6 +280,7 @@ async def analyze_incident(
     try:
         collected = collect_sources(request.sources, request.logs,
                     vm_targets=request.vm_targets,
+                    remote_targets=request.remote_targets,
                     db=db,
                     organization_id=current_user.organization_id)
         result = await ai.analyze_incident(collected, request.domain)
@@ -631,6 +633,121 @@ def delete_vm_credentials(
     db.commit()
  
     return {"message": "Credentials removed"}
+
+
+@app.get("/api/remote-targets", response_model=List[RemoteTargetInfo])
+def list_remote_targets(
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List remote/SSH log source targets configured for this organization."""
+    rows = db.query(RemoteTarget).filter(
+        RemoteTarget.organization_id == current_user.organization_id
+    ).order_by(RemoteTarget.name).all()
+    return [
+        RemoteTargetInfo(
+            name=row.name,
+            host=row.host,
+            port=row.port,
+            username=row.username,
+            auth_method=row.auth_method,
+            configured=True,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
+
+
+@app.post("/api/remote-targets", response_model=RemoteTargetStatus)
+def upsert_remote_target(
+    target: RemoteTargetCreate,
+    current_user: UserResponse = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Register (or replace) a remote/SSH log source connection profile.
+    The secret (password or private key) is encrypted at rest and never
+    returned in plaintext by any endpoint.
+    """
+    try:
+        encrypted_secret = encrypt_value(target.secret)
+    except CredentialEncryptionError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    existing = db.query(RemoteTarget).filter(
+        RemoteTarget.organization_id == current_user.organization_id,
+        RemoteTarget.name == target.name,
+    ).first()
+
+    if existing:
+        existing.host = target.host
+        existing.port = target.port
+        existing.username = target.username
+        existing.auth_method = target.auth_method.value
+        existing.encrypted_secret = encrypted_secret
+        existing.created_by_user_id = current_user.id
+        existing.created_at = datetime.utcnow()
+        record = existing
+    else:
+        record = RemoteTarget(
+            id=str(uuid.uuid4()),
+            organization_id=current_user.organization_id,
+            name=target.name,
+            host=target.host,
+            port=target.port,
+            username=target.username,
+            auth_method=target.auth_method.value,
+            encrypted_secret=encrypted_secret,
+            created_by_user_id=current_user.id,
+        )
+        db.add(record)
+
+    db.commit()
+    db.refresh(record)
+
+    audit = AuditLog(
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
+        action="REMOTE_TARGET_SET",
+        resource_type="remote_target",
+        resource_id=record.id,
+        details=f"Remote target: {target.name} ({target.host}:{target.port})",
+    )
+    db.add(audit)
+    db.commit()
+
+    return RemoteTargetStatus(name=record.name, configured=True, created_at=record.created_at)
+
+
+@app.delete("/api/remote-targets/{name}")
+def delete_remote_target(
+    name: str,
+    current_user: UserResponse = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db)
+):
+    """Remove a remote/SSH log source connection profile (admin only)."""
+    existing = db.query(RemoteTarget).filter(
+        RemoteTarget.organization_id == current_user.organization_id,
+        RemoteTarget.name == name,
+    ).first()
+    if not existing:
+        raise HTTPException(status_code=404, detail="No remote target configured with this name")
+
+    db.delete(existing)
+    db.commit()
+
+    audit = AuditLog(
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
+        action="REMOTE_TARGET_DELETED",
+        resource_type="remote_target",
+        resource_id=None,
+        details=f"Remote target: {name}",
+    )
+    db.add(audit)
+    db.commit()
+
+    return {"message": "Remote target removed"}
 
 # ============ HEALTH CHECK ============
 @app.get("/health")

@@ -91,6 +91,36 @@ class VMCredential(Base):
         UniqueConstraint("organization_id", "vm_name", name="uq_vm_credential_org_vm"),
     )
 
+class RemoteTarget(Base):
+    """
+    A generic, reusable connection profile for a remote/external log source
+    reachable over SSH — a bare-metal host, a cloud VM, a network device,
+    etc. This is deliberately generic (host/port/username/auth_method +
+    an encrypted secret) so future remote source types beyond SSH can
+    reuse the same table by adding a new auth_method rather than a new
+    model.
+
+    The secret (password, or SSH private key contents when
+    auth_method="ssh_key") is stored encrypted at rest via crypto_utils —
+    never in plaintext, never returned by any endpoint.
+    """
+    __tablename__ = "remote_targets"
+
+    id = Column(String(36), primary_key=True)
+    organization_id = Column(String(36), ForeignKey("organizations.id"), nullable=False)
+    name = Column(String(255), nullable=False, index=True)
+    host = Column(String(255), nullable=False)
+    port = Column(Integer, default=22)
+    username = Column(String(255), nullable=False)
+    auth_method = Column(String(20), nullable=False, default="password")  # password | ssh_key
+    encrypted_secret = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by_user_id = Column(String(36), ForeignKey("users.id"))
+
+    __table_args__ = (
+        UniqueConstraint("organization_id", "name", name="uq_remote_target_org_name"),
+    )
+
 Base.metadata.create_all(bind=engine)
 
 def get_db():
