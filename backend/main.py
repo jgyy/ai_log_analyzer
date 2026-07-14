@@ -40,6 +40,10 @@ load_dotenv()
 
 app = FastAPI(title="DevOps AI Analyzer - Enterprise")
 
+# Allowed CORS origins are configurable via the CORS_ORIGINS env var
+# (comma-separated), so the frontend's deployed URL (e.g. Vercel) can talk to
+# this backend without code changes. Defaults to the local Next.js dev server
+# so `uvicorn main:app --reload` keeps working out of the box.
 CORS_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")

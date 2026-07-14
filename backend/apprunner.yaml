@@ -1,0 +1,19 @@
+version: 1.0
+runtime: docker
+build:
+  commands:
+    build:
+      - echo "Build handled by Dockerfile"
+run:
+  runtime-version: latest
+  command: sh -c "uvicorn main:app --host 0.0.0.0 --port ${PORT}"
+  network:
+    port: 8000
+    env: PORT
+  env:
+    - name: AI_PROVIDER
+      value: "gemini"
+    # Secrets (GEMINI_API_KEY, ANTHROPIC_API_KEY, JWT_SECRET, DATABASE_URL,
+    # CORS_ALLOWED_ORIGINS) are set via the App Runner console/CLI as
+    # runtime environment variables / AWS Secrets Manager references —
+    # do NOT hardcode them here. See DEPLOYMENT.md.
