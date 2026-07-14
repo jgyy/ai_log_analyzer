@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Clipboard, ArrowRight, RotateCcw, Bot } from "lucide-react";
+import { ChevronDown, Clipboard, ArrowRight, RotateCcw, Bot } from "lucide-react";
 import { executeAction } from "@/lib/api";
 import { AnalysisResult, ExecutableAction } from "@/lib/types";
 import DiagramLayout from "@/components/DiagramLayout";
@@ -83,19 +83,28 @@ export default function MitigationTab({ data, diagram, actions = [] }: { data: A
           <StepCard title="Apply" steps={data.immediate_mitigation.apply} color="emerald" />
           <StepCard title="Post-Validate" steps={data.immediate_mitigation.post_validate} color="purple" />
 
-          <div className="p-4 border border-yellow-700/50 rounded-lg bg-yellow-950/30">
-            <h3 className="font-semibold text-yellow-300 mb-2 flex items-center gap-2"><RotateCcw className="h-4 w-4"/> Rollback Steps</h3>
-            <ol className="list-decimal list-inside text-sm text-yellow-200/80 space-y-1">
+          {/* Issue #14: rollback steps and the agent spec are reference detail
+              for deeper investigation, not part of the primary action list -
+              collapse them by default to keep Prepare/Apply front and center. */}
+          <details className="group p-4 border border-yellow-700/50 rounded-lg bg-yellow-950/30">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
+              <span className="font-semibold text-yellow-300 flex items-center gap-2"><RotateCcw className="h-4 w-4"/> Rollback Steps</span>
+              <ChevronDown className="h-4 w-4 text-yellow-300/70 transition-transform group-open:rotate-180" />
+            </summary>
+            <ol className="mt-3 list-decimal list-inside text-sm text-yellow-200/80 space-y-1">
               {data.rollback_steps.map((s,i) => <li key={i}>{s}</li>)}
             </ol>
-          </div>
+          </details>
 
-          <div className="p-4 border border-cyan-700/50 rounded-lg bg-cyan-950/30">
-            <h3 className="font-semibold text-cyan-300 mb-2 flex items-center gap-2"><Bot className="h-4 w-4"/> Agent Spec Ready</h3>
-            <pre className="text-xs text-cyan-200/80 whitespace-pre-wrap font-mono bg-black/30 p-3 rounded">
+          <details className="group p-4 border border-cyan-700/50 rounded-lg bg-cyan-950/30">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
+              <span className="font-semibold text-cyan-300 flex items-center gap-2"><Bot className="h-4 w-4"/> Agent Spec Ready</span>
+              <ChevronDown className="h-4 w-4 text-cyan-300/70 transition-transform group-open:rotate-180" />
+            </summary>
+            <pre className="mt-3 text-xs text-cyan-200/80 whitespace-pre-wrap font-mono bg-black/30 p-3 rounded">
               {data.agent_spec_ready.join("\n\n")}
             </pre>
-          </div>
+          </details>
         </div>
         </div>
 

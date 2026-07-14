@@ -65,6 +65,30 @@ Keep the response concise and avoid repeating the same fact across sections.
 Put secondary details in evidence and investigation_gaps instead of long paragraphs.
 """
 
+# Issue #14: the analysis text was too verbose to scan during an incident.
+# These rules push the model toward a short, structured, actionable response
+# (summary -> evidence -> root cause -> mitigation) instead of long paragraphs,
+# while keeping the underlying technical detail available in the
+# evidence/key_findings/investigation_gaps fields for deeper investigation.
+BREVITY_INSTRUCTIONS = """
+Write for incident triage, not a report. Be concise and avoid repeating the same fact in multiple sections:
+- Lead with the conclusion, then supporting evidence, then the recommended action - never the other way around.
+- Prefer short, direct statements over explanatory paragraphs. No generic DevOps background or definitions.
+- investigation_timeline fields (start, symptom, observation, finding, root_cause): 1 sentence each, stating only what happened.
+- root_cause.investigation_summary: maximum 2 sentences - the short summary of the issue.
+- root_cause.impact: 1 sentence.
+- root_cause.root_causes: maximum 3 items, 1 sentence each, ordered most-likely first.
+- root_cause.hypotheses: maximum 3 items, 1 sentence each.
+- root_cause.key_findings: maximum 4 items - this is where supporting evidence/technical detail belongs.
+- root_cause.investigation_gaps: maximum 3 items.
+- mitigation_plan.summary: maximum 2 sentences.
+- mitigation_plan immediate_mitigation steps: maximum 3 steps per phase (prepare/pre_validate/apply/post_validate).
+- mitigation step "description": maximum 140 characters; put commands/details in command_or_action, not description.
+- mitigation_plan.rollback_steps: maximum 3 items.
+- mitigation_plan.agent_spec_ready: maximum 3 short items.
+Do not drop useful technical detail - put secondary/raw details in key_findings, investigation_gaps, or evidence instead of long prose.
+"""
+
 # Mirrors the checks the frontend's sanitizer (frontend/components/MermaidDiagram.tsx)
 # runs defensively before rendering — used here to catch bad diagrams *before*
 # they leave the backend and ask the model to regenerate them instead.
